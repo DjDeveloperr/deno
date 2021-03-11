@@ -4,6 +4,7 @@ mod dispatch_minimal;
 pub use dispatch_minimal::MinimalOp;
 
 pub mod crypto;
+pub mod clipboard;
 pub mod fetch;
 pub mod fs;
 pub mod fs_events;

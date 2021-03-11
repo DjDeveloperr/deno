@@ -36,6 +36,7 @@ delete Object.prototype.__proto__;
   const denoNsUnstable = window.__bootstrap.denoNsUnstable;
   const errors = window.__bootstrap.errors.errors;
   const webidl = window.__bootstrap.webidl;
+  const clipboard = window.__bootstrap.clipboard;
   const { defineEventHandler } = window.__bootstrap.webUtil;
 
   let windowIsClosing = false;
@@ -225,6 +226,14 @@ delete Object.prototype.__proto__;
         return webgpu.gpu;
       },
     },
+    clipboard: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        webidl.assertBranded(this, Navigator);
+        return clipboard.clipboard;
+      },
+    },
   });
 
   class WorkerNavigator {
@@ -248,6 +257,14 @@ delete Object.prototype.__proto__;
         return webgpu.gpu;
       },
     },
+    clipboard: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        webidl.assertBranded(this, WorkerNavigator);
+        return clipboard.clipboard;
+      },
+    },
   });
 
   // https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope
@@ -261,6 +278,7 @@ delete Object.prototype.__proto__;
       streams.CountQueuingStrategy,
     ),
     CustomEvent: util.nonEnumerable(CustomEvent),
+    ClipboardItem: util.nonEnumerable(clipboard.ClipboardItem),
     DOMException: util.nonEnumerable(DOMException),
     ErrorEvent: util.nonEnumerable(ErrorEvent),
     Event: util.nonEnumerable(Event),

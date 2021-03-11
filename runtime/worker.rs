@@ -150,6 +150,7 @@ impl MainWorker {
       ops::tls::init(js_runtime);
       ops::tty::init(js_runtime);
       ops::webgpu::init(js_runtime);
+      ops::clipboard::init(js_runtime);
       ops::websocket::init(
         js_runtime,
         options.user_agent.clone(),
