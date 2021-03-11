@@ -16,7 +16,7 @@
       return new Promise((resolve, reject) => {
         // TODO: Check permission
         let textData = "";
-        let result = core.jsonOpSync("op_clipboard_read_text");
+        const result = core.jsonOpSync("op_clipboard_read_text");
         if (result) textData = result;
         resolve(textData);
       });
@@ -25,7 +25,7 @@
     writeText(text) {
       return new Promise((resolve, reject) => {
         // TODO: Check permission
-        core.jsonOpSync("op_clipboard_write_text");
+        core.jsonOpSync("op_clipboard_write_text", text);
         resolve();
       });
     }
