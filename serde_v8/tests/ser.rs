@@ -138,6 +138,10 @@ sertest!(
   "objEqual(x, {a: 1, b: 2, c: 3})"
 );
 
+sertest!(ser_u128, u128::MAX, "x === 2n ** 128n - 1n");
+
+sertest!(ser_i128, i128::MAX, "x === 2n ** 128n / 2n - 1n");
+
 ////
 // JSON tests: json!() compatibility
 ////

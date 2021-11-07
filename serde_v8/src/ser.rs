@@ -484,6 +484,30 @@ impl<'a, 'b, 'c> ser::Serializer for Serializer<'a, 'b, 'c> {
     Ok(v8::Number::new(&mut self.scope.borrow_mut(), v).into())
   }
 
+  fn serialize_u128(self, v: u128) -> JsResult<'a> {
+    Ok(
+      v8::BigInt::new_from_words(
+        &mut self.scope.borrow_mut(),
+        false,
+        &[v as u64, (v >> 64) as u64],
+      )
+      .unwrap()
+      .into(),
+    )
+  }
+
+  fn serialize_i128(self, v: i128) -> JsResult<'a> {
+    Ok(
+      v8::BigInt::new_from_words(
+        &mut self.scope.borrow_mut(),
+        v < 0,
+        &[v as u64, (v >> 64) as u64],
+      )
+      .unwrap()
+      .into(),
+    )
+  }
+
   fn serialize_bool(self, v: bool) -> JsResult<'a> {
     Ok(v8::Boolean::new(&mut self.scope.borrow_mut(), v).into())
   }
