@@ -24,7 +24,7 @@ use error::DomExceptionOperationError;
 use error::WebGpuResult;
 
 #[macro_use]
-mod macros {
+pub mod macros {
   macro_rules! gfx_select {
     ($id:expr => $global:ident.$method:ident( $($param:expr),* )) => {
       match $id.backend() {
@@ -83,23 +83,23 @@ fn check_unstable(state: &OpState, api_name: &str) {
   }
 }
 
-type Instance = wgpu_core::hub::Global<wgpu_core::hub::IdentityManagerFactory>;
+pub type Instance = wgpu_core::hub::Global<wgpu_core::hub::IdentityManagerFactory>;
 
-struct WebGpuAdapter(wgpu_core::id::AdapterId);
+pub struct WebGpuAdapter(pub wgpu_core::id::AdapterId);
 impl Resource for WebGpuAdapter {
   fn name(&self) -> Cow<str> {
     "webGPUAdapter".into()
   }
 }
 
-struct WebGpuDevice(wgpu_core::id::DeviceId);
+pub struct WebGpuDevice(pub wgpu_core::id::DeviceId);
 impl Resource for WebGpuDevice {
   fn name(&self) -> Cow<str> {
     "webGPUDevice".into()
   }
 }
 
-struct WebGpuQuerySet(wgpu_core::id::QuerySetId);
+pub struct WebGpuQuerySet(pub wgpu_core::id::QuerySetId);
 impl Resource for WebGpuQuerySet {
   fn name(&self) -> Cow<str> {
     "webGPUQuerySet".into()

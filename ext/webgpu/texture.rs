@@ -8,14 +8,14 @@ use serde::Deserialize;
 use std::borrow::Cow;
 
 use super::error::WebGpuResult;
-pub(crate) struct WebGpuTexture(pub(crate) wgpu_core::id::TextureId);
+pub struct WebGpuTexture(pub wgpu_core::id::TextureId);
 impl Resource for WebGpuTexture {
   fn name(&self) -> Cow<str> {
     "webGPUTexture".into()
   }
 }
 
-pub(crate) struct WebGpuTextureView(pub(crate) wgpu_core::id::TextureViewId);
+pub struct WebGpuTextureView(pub wgpu_core::id::TextureViewId);
 impl Resource for WebGpuTextureView {
   fn name(&self) -> Cow<str> {
     "webGPUTextureView".into()
