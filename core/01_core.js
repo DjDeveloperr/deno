@@ -135,6 +135,9 @@
   }
 
   function opAsync(opName, arg1 = null, arg2 = null) {
+    if (typeof opsCache[opName] !== "number") {
+      throw new Error(`Op with name "${opName}" not found`);
+    }
     const promiseId = nextPromiseId++;
     const maybeError = opcallAsync(opsCache[opName], promiseId, arg1, arg2);
     // Handle sync error (e.g: error parsing args)
@@ -146,6 +149,9 @@
   }
 
   function opSync(opName, arg1 = null, arg2 = null) {
+    if (typeof opsCache[opName] !== "number") {
+      throw new Error(`Op with name "${opName}" not found`);
+    }
     return unwrapOpResult(opcallSync(opsCache[opName], arg1, arg2));
   }
 
