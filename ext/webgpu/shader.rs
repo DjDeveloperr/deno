@@ -40,6 +40,7 @@ pub fn op_webgpu_create_shader_module(
 
   let descriptor = wgpu_core::pipeline::ShaderModuleDescriptor {
     label: args.label.map(Cow::from),
+    shader_bound_checks: unsafe{wgpu_types::ShaderBoundChecks::unchecked()},
   };
 
   gfx_put!(device => instance.device_create_shader_module(
