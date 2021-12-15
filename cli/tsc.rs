@@ -144,31 +144,26 @@ fn get_tsc_media_type(specifier: &ModuleSpecifier) -> MediaType {
         if let Some(os_str) = path.file_stem() {
           if let Some(file_name) = os_str.to_str() {
             if file_name.ends_with(".d") {
-              // todo(#12410): Use Dmts for TS 4.5
-              return MediaType::Dts;
+              return MediaType::Dmts;
             }
           }
         }
-        // todo(#12410): Use Mts for TS 4.5
-        MediaType::TypeScript
+        MediaType::Mts
       }
       Some("cts") => {
         if let Some(os_str) = path.file_stem() {
           if let Some(file_name) = os_str.to_str() {
             if file_name.ends_with(".d") {
-              // todo(#12410): Use Dcts for TS 4.5
-              return MediaType::Dts;
+              return MediaType::Dcts;
             }
           }
         }
-        // todo(#12410): Use Cts for TS 4.5
-        MediaType::TypeScript
+        MediaType::Cts
       }
       Some("tsx") => MediaType::Tsx,
       Some("js") => MediaType::JavaScript,
-      // todo(#12410): Use correct media type for TS 4.5
-      Some("mjs") => MediaType::JavaScript,
-      Some("cjs") => MediaType::JavaScript,
+      Some("mjs") => MediaType::Mjs,
+      Some("cjs") => MediaType::Cjs,
       Some("jsx") => MediaType::Jsx,
       _ => MediaType::Unknown,
     },
@@ -389,8 +384,8 @@ fn op_load(state: &mut State, args: Value) -> Result<Value, AnyError> {
       specifier
     };
     let maybe_source = if let Some(module) = state.graph.get(&specifier) {
-      media_type = module.media_type;
-      Some(module.source.as_str().to_string())
+      media_type = *module.media_type();
+      module.maybe_source().map(String::from)
     } else {
       media_type = MediaType::Unknown;
       None
@@ -421,7 +416,7 @@ fn resolve_specifier(
   let media_type = state
     .graph
     .get(specifier)
-    .map_or(&MediaType::Unknown, |m| &m.media_type);
+    .map_or(&MediaType::Unknown, |m| m.media_type());
   let specifier_str = match specifier.scheme() {
     "data" | "blob" => {
       let specifier_str = hash_url(specifier, media_type);
@@ -756,16 +751,16 @@ mod tests {
   fn test_get_tsc_media_type() {
     let fixtures = vec![
       ("file:///a.ts", MediaType::TypeScript),
-      ("file:///a.cts", MediaType::TypeScript),
-      ("file:///a.mts", MediaType::TypeScript),
+      ("file:///a.cts", MediaType::Cts),
+      ("file:///a.mts", MediaType::Mts),
       ("file:///a.tsx", MediaType::Tsx),
       ("file:///a.d.ts", MediaType::Dts),
-      ("file:///a.d.cts", MediaType::Dts),
-      ("file:///a.d.mts", MediaType::Dts),
+      ("file:///a.d.cts", MediaType::Dcts),
+      ("file:///a.d.mts", MediaType::Dmts),
       ("file:///a.js", MediaType::JavaScript),
       ("file:///a.jsx", MediaType::Jsx),
-      ("file:///a.cjs", MediaType::JavaScript),
-      ("file:///a.mjs", MediaType::JavaScript),
+      ("file:///a.cjs", MediaType::Cjs),
+      ("file:///a.mjs", MediaType::Mjs),
       ("file:///a.json", MediaType::Unknown),
       ("file:///a.wasm", MediaType::Unknown),
       ("file:///a.js.map", MediaType::Unknown),

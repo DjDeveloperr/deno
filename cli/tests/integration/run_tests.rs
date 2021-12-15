@@ -233,7 +233,6 @@ itest!(_070_location {
 itest!(_071_location_unset {
   args: "run 071_location_unset.ts",
   output: "071_location_unset.ts.out",
-  exit_code: 1,
 });
 
 itest!(_072_location_relative_fetch {
@@ -563,6 +562,26 @@ itest!(fetch_response_finalization {
   exit_code: 0,
 });
 
+itest!(import_type {
+  args: "run --reload import_type.ts",
+  output: "import_type.ts.out",
+});
+
+itest!(import_type_no_check {
+  args: "run --reload --no-check import_type.ts",
+  output: "import_type.ts.out",
+});
+
+itest!(private_field_presence {
+  args: "run --reload private_field_presence.ts",
+  output: "private_field_presence.ts.out",
+});
+
+itest!(private_field_presence_no_check {
+  args: "run --reload --no-check private_field_presence.ts",
+  output: "private_field_presence.ts.out",
+});
+
 itest!(lock_write_requires_lock {
   args: "run --lock-write some_file.ts",
   output: "lock_write_requires_lock.out",
@@ -609,6 +628,16 @@ itest!(lock_check_err2 {
   output: "lock_check_err2.out",
   exit_code: 10,
   http_server: true,
+});
+
+itest!(mts_dmts_mjs {
+  args: "run subdir/import.mts",
+  output: "mts_dmts_mjs.out",
+});
+
+itest!(mts_dmts_mjs_no_check {
+  args: "run --no-check subdir/import.mts",
+  output: "mts_dmts_mjs.out",
 });
 
 itest!(async_error {
@@ -859,6 +888,30 @@ itest!(exit_error42 {
   output: "exit_error42.ts.out",
 });
 
+itest!(set_exit_code_0 {
+  args: "run --no-check --unstable set_exit_code_0.ts",
+  output: "empty.out",
+  exit_code: 0,
+});
+
+itest!(set_exit_code_1 {
+  args: "run --no-check --unstable set_exit_code_1.ts",
+  output: "empty.out",
+  exit_code: 42,
+});
+
+itest!(set_exit_code_2 {
+  args: "run --no-check --unstable set_exit_code_2.ts",
+  output: "empty.out",
+  exit_code: 42,
+});
+
+itest!(set_exit_code_in_worker {
+  args: "run --no-check --unstable --allow-read set_exit_code_in_worker.ts",
+  output: "empty.out",
+  exit_code: 42,
+});
+
 itest!(heapstats {
   args: "run --quiet --unstable --v8-flags=--expose-gc heapstats.js",
   output: "heapstats.js.out",
@@ -900,6 +953,19 @@ itest!(no_check {
 itest!(no_check_decorators {
   args: "run --quiet --reload --no-check no_check_decorators.ts",
   output: "no_check_decorators.ts.out",
+});
+
+itest!(check_remote {
+  args: "run --quiet --reload no_check_remote.ts",
+  output: "no_check_remote.ts.disabled.out",
+  exit_code: 1,
+  http_server: true,
+});
+
+itest!(no_check_remote {
+  args: "run --quiet --reload --no-check=remote no_check_remote.ts",
+  output: "no_check_remote.ts.enabled.out",
+  http_server: true,
 });
 
 itest!(runtime_decorators {

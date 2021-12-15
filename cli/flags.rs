@@ -188,6 +188,24 @@ impl Default for DenoSubcommand {
   }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum CheckFlag {
+  /// Type check all modules. The default value.
+  All,
+  /// Skip type checking of all modules. Represents `--no-check` on the command
+  /// line.
+  None,
+  /// Only type check local modules. Represents `--no-check=remote` on the
+  /// command line.
+  Local,
+}
+
+impl Default for CheckFlag {
+  fn default() -> Self {
+    Self::All
+  }
+}
+
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Flags {
   /// Vector of CLI arguments - these are user script arguments, all Deno
@@ -209,6 +227,7 @@ pub struct Flags {
   /// the language server is configured with an explicit cache option.
   pub cache_path: Option<PathBuf>,
   pub cached_only: bool,
+  pub check: CheckFlag,
   pub config_path: Option<String>,
   pub coverage_dir: Option<String>,
   pub enable_testing_features: bool,
@@ -220,7 +239,6 @@ pub struct Flags {
   pub lock_write: bool,
   pub lock: Option<PathBuf>,
   pub log_level: Option<Level>,
-  pub no_check: bool,
   pub no_remote: bool,
   /// If true, a list of Node built-in modules will be injected into
   /// the import map.
@@ -1153,6 +1171,7 @@ fn repl_subcommand<'a, 'b>() -> App<'a, 'b> {
         .takes_value(true)
         .value_name("code"),
     )
+    .arg(unsafely_ignore_ceritifcate_errors_arg())
 }
 
 fn run_subcommand<'a, 'b>() -> App<'a, 'b> {
@@ -1408,17 +1427,7 @@ fn permission_args<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
         .help("Allow network access")
         .validator(crate::flags_allow_net::validator),
     )
-    .arg(
-      Arg::with_name("unsafely-ignore-certificate-errors")
-        .long("unsafely-ignore-certificate-errors")
-        .min_values(0)
-        .takes_value(true)
-        .use_delimiter(true)
-        .require_equals(true)
-        .value_name("HOSTNAMES")
-        .help("DANGER: Disables verification of TLS certificates")
-        .validator(crate::flags_allow_net::validator),
-    )
+    .arg(unsafely_ignore_ceritifcate_errors_arg())
     .arg(
       Arg::with_name("allow-env")
         .long("allow-env")
@@ -1643,8 +1652,17 @@ Only local files from entry point module graph are watched.",
 
 fn no_check_arg<'a, 'b>() -> Arg<'a, 'b> {
   Arg::with_name("no-check")
+    .takes_value(true)
+    .require_equals(true)
+    .min_values(0)
+    .value_name("NO_CHECK_TYPE")
     .long("no-check")
     .help("Skip type checking modules")
+    .long_help(
+      "Skip type checking of modules.
+If the value of '--no-check=remote' is supplied, diagnostic errors from remote
+modules will be ignored.",
+    )
 }
 
 fn script_arg<'a, 'b>() -> Arg<'a, 'b> {
@@ -1699,6 +1717,18 @@ fn no_remote_arg<'a, 'b>() -> Arg<'a, 'b> {
   Arg::with_name("no-remote")
     .long("no-remote")
     .help("Do not resolve remote modules")
+}
+
+fn unsafely_ignore_ceritifcate_errors_arg<'a, 'b>() -> Arg<'a, 'b> {
+  Arg::with_name("unsafely-ignore-certificate-errors")
+    .long("unsafely-ignore-certificate-errors")
+    .min_values(0)
+    .takes_value(true)
+    .use_delimiter(true)
+    .require_equals(true)
+    .value_name("HOSTNAMES")
+    .help("DANGER: Disables verification of TLS certificates")
+    .validator(crate::flags_allow_net::validator)
 }
 
 fn bundle_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
@@ -2002,6 +2032,7 @@ fn lint_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
 
 fn repl_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
   runtime_args_parse(flags, matches, false, true);
+  unsafely_ignore_ceritifcate_errors_parse(flags, matches);
   flags.repl = true;
   flags.subcommand = DenoSubcommand::Repl(ReplFlags {
     eval: matches.value_of("eval").map(ToOwned::to_owned),
@@ -2157,6 +2188,7 @@ fn compile_args_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
 }
 
 fn permission_args_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
+  unsafely_ignore_ceritifcate_errors_parse(flags, matches);
   if let Some(read_wl) = matches.values_of("allow-read") {
     let read_allowlist: Vec<PathBuf> = read_wl.map(PathBuf::from).collect();
     flags.allow_read = Some(read_allowlist);
@@ -2172,13 +2204,6 @@ fn permission_args_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
       crate::flags_allow_net::parse(net_wl.map(ToString::to_string).collect())
         .unwrap();
     flags.allow_net = Some(net_allowlist);
-  }
-
-  if let Some(ic_wl) = matches.values_of("unsafely-ignore-certificate-errors") {
-    let ic_allowlist: Vec<String> =
-      crate::flags_allow_net::parse(ic_wl.map(ToString::to_string).collect())
-        .unwrap();
-    flags.unsafely_ignore_certificate_errors = Some(ic_allowlist);
   }
 
   if let Some(env_wl) = matches.values_of("allow-env") {
@@ -2223,7 +2248,17 @@ fn permission_args_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
     flags.prompt = true;
   }
 }
-
+fn unsafely_ignore_ceritifcate_errors_parse(
+  flags: &mut Flags,
+  matches: &clap::ArgMatches,
+) {
+  if let Some(ic_wl) = matches.values_of("unsafely-ignore-certificate-errors") {
+    let ic_allowlist: Vec<String> =
+      crate::flags_allow_net::parse(ic_wl.map(ToString::to_string).collect())
+        .unwrap();
+    flags.unsafely_ignore_certificate_errors = Some(ic_allowlist);
+  }
+}
 fn runtime_args_parse(
   flags: &mut Flags,
   matches: &clap::ArgMatches,
@@ -2334,8 +2369,16 @@ fn compat_arg_parse(flags: &mut Flags, matches: &ArgMatches) {
 }
 
 fn no_check_arg_parse(flags: &mut Flags, matches: &clap::ArgMatches) {
-  if matches.is_present("no-check") {
-    flags.no_check = true;
+  if let Some(cache_type) = matches.value_of("no-check") {
+    match cache_type {
+      "remote" => flags.check = CheckFlag::Local,
+      _ => debug!(
+        "invalid value for 'no-check' of '{}' using default",
+        cache_type
+      ),
+    }
+  } else if matches.is_present("no-check") {
+    flags.check = CheckFlag::None;
   }
 }
 
@@ -3131,7 +3174,7 @@ mod tests {
         import_map_path: Some("import_map.json".to_string()),
         no_remote: true,
         config_path: Some("tsconfig.json".to_string()),
-        no_check: true,
+        check: CheckFlag::None,
         reload: true,
         lock: Some(PathBuf::from("lock.json")),
         lock_write: true,
@@ -3207,7 +3250,7 @@ mod tests {
   #[test]
   fn repl_with_flags() {
     #[rustfmt::skip]
-    let r = flags_from_vec(svec!["deno", "repl", "--import-map", "import_map.json", "--no-remote", "--config", "tsconfig.json", "--no-check", "--reload", "--lock", "lock.json", "--lock-write", "--cert", "example.crt", "--cached-only", "--location", "https:foo", "--v8-flags=--help", "--seed", "1", "--inspect=127.0.0.1:9229"]);
+    let r = flags_from_vec(svec!["deno", "repl", "--import-map", "import_map.json", "--no-remote", "--config", "tsconfig.json", "--no-check", "--reload", "--lock", "lock.json", "--lock-write", "--cert", "example.crt", "--cached-only", "--location", "https:foo", "--v8-flags=--help", "--seed", "1", "--inspect=127.0.0.1:9229", "--unsafely-ignore-certificate-errors"]);
     assert_eq!(
       r.unwrap(),
       Flags {
@@ -3216,7 +3259,7 @@ mod tests {
         import_map_path: Some("import_map.json".to_string()),
         no_remote: true,
         config_path: Some("tsconfig.json".to_string()),
-        no_check: true,
+        check: CheckFlag::None,
         reload: true,
         lock: Some(PathBuf::from("lock.json")),
         lock_write: true,
@@ -3233,6 +3276,7 @@ mod tests {
         allow_write: Some(vec![]),
         allow_ffi: Some(vec![]),
         allow_hrtime: true,
+        unsafely_ignore_certificate_errors: Some(vec![]),
         ..Flags::default()
       }
     );
@@ -3483,7 +3527,7 @@ mod tests {
           source_file: "script.ts".to_string(),
           out_file: None,
         }),
-        no_check: true,
+        check: CheckFlag::None,
         ..Flags::default()
       }
     );
@@ -3682,7 +3726,7 @@ mod tests {
         import_map_path: Some("import_map.json".to_string()),
         no_remote: true,
         config_path: Some("tsconfig.json".to_string()),
-        no_check: true,
+        check: CheckFlag::None,
         reload: true,
         lock: Some(PathBuf::from("lock.json")),
         lock_write: true,
@@ -3833,14 +3877,59 @@ mod tests {
         subcommand: DenoSubcommand::Run(RunFlags {
           script: "script.ts".to_string(),
         }),
-        no_check: true,
+        check: CheckFlag::None,
         ..Flags::default()
       }
     );
   }
 
   #[test]
-  fn unsafely_ignore_certificate_errors() {
+  fn no_check_remote() {
+    let r =
+      flags_from_vec(svec!["deno", "run", "--no-check=remote", "script.ts"]);
+    assert_eq!(
+      r.unwrap(),
+      Flags {
+        subcommand: DenoSubcommand::Run(RunFlags {
+          script: "script.ts".to_string(),
+        }),
+        check: CheckFlag::Local,
+        ..Flags::default()
+      }
+    );
+  }
+
+  #[test]
+  fn repl_with_unsafely_ignore_certificate_errors() {
+    let r = flags_from_vec(svec![
+      "deno",
+      "repl",
+      "--eval",
+      "console.log('hello');",
+      "--unsafely-ignore-certificate-errors"
+    ]);
+    assert_eq!(
+      r.unwrap(),
+      Flags {
+        repl: true,
+        subcommand: DenoSubcommand::Repl(ReplFlags {
+          eval: Some("console.log('hello');".to_string()),
+        }),
+        unsafely_ignore_certificate_errors: Some(vec![]),
+        allow_net: Some(vec![]),
+        allow_env: Some(vec![]),
+        allow_run: Some(vec![]),
+        allow_read: Some(vec![]),
+        allow_write: Some(vec![]),
+        allow_ffi: Some(vec![]),
+        allow_hrtime: true,
+        ..Flags::default()
+      }
+    );
+  }
+
+  #[test]
+  fn run_with_unsafely_ignore_certificate_errors() {
     let r = flags_from_vec(svec![
       "deno",
       "run",
@@ -3860,7 +3949,7 @@ mod tests {
   }
 
   #[test]
-  fn unsafely_treat_insecure_origin_as_secure_with_ipv6_address() {
+  fn run_with_unsafely_treat_insecure_origin_as_secure_with_ipv6_address() {
     let r = flags_from_vec(svec![
       "deno",
       "run",
@@ -3881,6 +3970,37 @@ mod tests {
           "[::1]",
           "1.2.3.4"
         ]),
+        ..Flags::default()
+      }
+    );
+  }
+
+  #[test]
+  fn repl_with_unsafely_treat_insecure_origin_as_secure_with_ipv6_address() {
+    let r = flags_from_vec(svec![
+      "deno",
+      "repl",
+      "--unsafely-ignore-certificate-errors=deno.land,localhost,::,127.0.0.1,[::1],1.2.3.4"]);
+    assert_eq!(
+      r.unwrap(),
+      Flags {
+        repl: true,
+        subcommand: DenoSubcommand::Repl(ReplFlags { eval: None }),
+        unsafely_ignore_certificate_errors: Some(svec![
+          "deno.land",
+          "localhost",
+          "::",
+          "127.0.0.1",
+          "[::1]",
+          "1.2.3.4"
+        ]),
+        allow_net: Some(vec![]),
+        allow_env: Some(vec![]),
+        allow_run: Some(vec![]),
+        allow_read: Some(vec![]),
+        allow_write: Some(vec![]),
+        allow_ffi: Some(vec![]),
+        allow_hrtime: true,
         ..Flags::default()
       }
     );
@@ -4406,7 +4526,7 @@ mod tests {
         import_map_path: Some("import_map.json".to_string()),
         no_remote: true,
         config_path: Some("tsconfig.json".to_string()),
-        no_check: true,
+        check: CheckFlag::None,
         reload: true,
         lock: Some(PathBuf::from("lock.json")),
         lock_write: true,

@@ -12,6 +12,7 @@ use crate::config_file::ConfigFile;
 use crate::config_file::IgnoredCompilerOptions;
 use crate::config_file::TsConfig;
 use crate::diagnostics::Diagnostics;
+use crate::flags;
 use crate::tsc;
 use crate::version;
 
@@ -249,9 +250,11 @@ fn get_root_names(
       .into_iter()
       .filter_map(|(_, r)| match r {
         Ok((s, mt)) => match &mt {
-          MediaType::TypeScript | MediaType::Tsx | MediaType::Jsx => {
-            Some((s, mt))
-          }
+          MediaType::TypeScript
+          | MediaType::Tsx
+          | MediaType::Mts
+          | MediaType::Cts
+          | MediaType::Jsx => Some((s, mt)),
           _ => None,
         },
         _ => None,
@@ -261,7 +264,11 @@ fn get_root_names(
     graph
       .roots
       .iter()
-      .filter_map(|s| graph.get(s).map(|m| (m.specifier.clone(), m.media_type)))
+      .filter_map(|s| {
+        graph
+          .get(s)
+          .map(|m| (m.specifier().clone(), *m.media_type()))
+      })
       .collect()
   }
 }
@@ -278,7 +285,7 @@ fn get_version(source_bytes: &[u8], config_bytes: &[u8]) -> String {
 }
 
 /// Determine if a given media type is emittable or not.
-fn is_emittable(media_type: &MediaType, include_js: bool) -> bool {
+pub(crate) fn is_emittable(media_type: &MediaType, include_js: bool) -> bool {
   match &media_type {
     MediaType::TypeScript
     | MediaType::Mts
@@ -293,6 +300,9 @@ fn is_emittable(media_type: &MediaType, include_js: bool) -> bool {
 /// Options for performing a check of a module graph. Note that the decision to
 /// emit or not is determined by the `ts_config` settings.
 pub(crate) struct CheckOptions {
+  /// The check flag from the option which can effect the filtering of
+  /// diagnostics in the emit result.
+  pub check: flags::CheckFlag,
   /// Set the debug flag on the TypeScript type checker.
   pub debug: bool,
   /// If true, any files emitted will be cached, even if there are diagnostics
@@ -357,9 +367,21 @@ pub(crate) fn check_and_maybe_emit(
     root_names,
   })?;
 
+  let diagnostics = if options.check == flags::CheckFlag::Local {
+    response.diagnostics.filter(|d| {
+      if let Some(file_name) = &d.file_name {
+        !file_name.starts_with("http")
+      } else {
+        true
+      }
+    })
+  } else {
+    response.diagnostics
+  };
+
   // sometimes we want to emit when there are diagnostics, and sometimes we
   // don't. tsc will always return an emit if there are diagnostics
-  if (response.diagnostics.is_empty() || options.emit_with_diagnostics)
+  if (diagnostics.is_empty() || options.emit_with_diagnostics)
     && !response.emitted_files.is_empty()
   {
     if let Some(info) = &response.maybe_tsbuildinfo {
@@ -376,7 +398,7 @@ pub(crate) fn check_and_maybe_emit(
         // resolve it via the graph.
         let specifier = graph.resolve(&specifiers[0]);
         let (media_type, source) = if let Some(module) = graph.get(&specifier) {
-          (&module.media_type, module.source.clone())
+          (module.media_type(), module.maybe_source().unwrap_or(""))
         } else {
           log::debug!("module missing, skipping emit for {}", specifier);
           continue;
@@ -414,7 +436,7 @@ pub(crate) fn check_and_maybe_emit(
   }
 
   Ok(CheckEmitResult {
-    diagnostics: response.diagnostics,
+    diagnostics,
     stats: response.stats,
   })
 }
@@ -461,8 +483,8 @@ impl swc::bundler::Load for BundleLoader<'_> {
         if let Some(m) = self.graph.get(specifier) {
           let (fm, module) = ast::transpile_module(
             specifier,
-            &m.source,
-            m.media_type,
+            m.maybe_source().unwrap_or(""),
+            *m.media_type(),
             self.emit_options,
             self.cm.clone(),
           )?;
@@ -707,7 +729,11 @@ pub(crate) fn valid_emit(
           false
         } else if let Some(version) = cache.get(CacheType::Version, s) {
           if let Some(module) = graph.get(s) {
-            version == get_version(module.source.as_bytes(), &config_bytes)
+            version
+              == get_version(
+                module.maybe_source().unwrap_or("").as_bytes(),
+                &config_bytes,
+              )
           } else {
             // We have a source module in the graph we can't find, so the emit is
             // clearly wrong
@@ -780,7 +806,10 @@ pub(crate) fn to_file_map(
           | MediaType::Unknown
       ) {
         if let Some(module) = graph.get(&specifier) {
-          files.insert(specifier.to_string(), module.source.to_string());
+          files.insert(
+            specifier.to_string(),
+            module.maybe_source().unwrap_or("").to_string(),
+          );
         }
       }
       if let Some(declaration) = cache.get(CacheType::Declaration, &specifier) {

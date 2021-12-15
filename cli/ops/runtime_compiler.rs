@@ -5,6 +5,7 @@ use crate::config_file::IgnoredCompilerOptions;
 use crate::diagnostics::Diagnostics;
 use crate::emit;
 use crate::errors::get_error_class_name;
+use crate::flags;
 use crate::proc_state::ProcState;
 use crate::resolver::ImportMapResolver;
 use crate::resolver::JsxResolver;
@@ -165,7 +166,9 @@ async fn op_emit(
     args.import_map_path
   {
     let import_map_specifier = resolve_url_or_path(&import_map_str)
-      .context(format!("Bad URL (\"{}\") for import map.", import_map_str))?;
+      .with_context(|| {
+        format!("Bad URL (\"{}\") for import map.", import_map_str)
+      })?;
     let import_map = if let Some(value) = args.import_map {
       ImportMap::from_json(import_map_specifier.as_str(), &value.to_string())?
     } else {
@@ -248,6 +251,7 @@ async fn op_emit(
         graph.clone(),
         cache.as_mut_cacher(),
         emit::CheckOptions {
+          check: flags::CheckFlag::All,
           debug,
           emit_with_diagnostics: true,
           maybe_config_specifier: None,
@@ -268,6 +272,7 @@ async fn op_emit(
         graph.clone(),
         cache.as_mut_cacher(),
         emit::CheckOptions {
+          check: flags::CheckFlag::All,
           debug,
           emit_with_diagnostics: true,
           maybe_config_specifier: None,
