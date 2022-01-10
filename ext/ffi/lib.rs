@@ -76,10 +76,14 @@ impl Resource for DynamicLibraryResource {
 impl DynamicLibraryResource {
   fn register(
     &mut self,
-    symbol: String,
+    name: String,
     foreign_fn: ForeignFunction,
   ) -> Result<(), AnyError> {
-    let fn_ptr = unsafe { self.lib.symbol::<*const c_void>(&symbol) }?;
+    let symbol = match &foreign_fn.name {
+      Some(symbol) => symbol,
+      None => &name,
+    };
+    let fn_ptr = unsafe { self.lib.symbol::<*const c_void>(symbol) }?;
     let ptr = libffi::middle::CodePtr::from_ptr(fn_ptr as _);
     let cif = libffi::middle::Cif::new(
       foreign_fn
@@ -91,7 +95,7 @@ impl DynamicLibraryResource {
     );
 
     self.symbols.insert(
-      symbol,
+      name,
       Symbol {
         cif,
         ptr,
@@ -316,6 +320,7 @@ impl From<U32x2> for u64 {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ForeignFunction {
+  name: Option<String>,
   parameters: Vec<NativeType>,
   result: NativeType,
 }
