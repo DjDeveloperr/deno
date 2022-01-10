@@ -1,4 +1,4 @@
-// Copyright 2018-2021 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
 use crate::deno_dir::DenoDir;
 use crate::flags::CheckFlag;
@@ -204,6 +204,7 @@ pub fn compile_to_runtime_flags(
     subcommand: DenoSubcommand::Run(RunFlags {
       script: "placeholder".to_string(),
     }),
+    allow_all: flags.allow_all,
     allow_env: flags.allow_env,
     allow_hrtime: flags.allow_hrtime,
     allow_net: flags.allow_net,
