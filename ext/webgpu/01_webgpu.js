@@ -45,6 +45,32 @@
     Uint8Array,
   } = window.__bootstrap.primordials;
 
+  const _name = Symbol("[[name]]");
+  const _adapter = Symbol("[[adapter]]");
+  const _cleanup = Symbol("[[cleanup]]");
+  const _limits = Symbol("[[limits]]");
+  const _features = Symbol("[[features]]");
+  const _reason = Symbol("[[reason]]");
+  const _message = Symbol("[[message]]");
+  const _label = Symbol("[[label]]");
+  const _validConfiguration = Symbol("[[validConfiguration]]");
+  const _configuration = Symbol("[[configuration]]");
+  const _currentTexture = Symbol("[[currentTexture]]");
+  const _device = Symbol("[[device]]");
+  const _queue = Symbol("[[queue]]");
+  const _rid = Symbol("[[rid]]");
+  const _size = Symbol("[[size]]");
+  const _usage = Symbol("[[usage]]");
+  const _state = Symbol("[[state]]");
+  const _mappingRange = Symbol("[[mapping_range]]");
+  const _mappedRanges = Symbol("[[mapped_ranges]]");
+  const _mapMode = Symbol("[[map_mode]]");
+  const _views = Symbol("[[views]]");
+  const _texture = Symbol("[[texture]]");
+  const _encoders = Symbol("[[encoders]]");
+  const _encoder = Symbol("[[encoder]]");
+  const _descriptor = Symbol("[[descriptor]]");
+
   /**
    * @param {any} self
    * @param {{prefix: string, context: string}} opts
@@ -206,10 +232,6 @@
     }
   }
 
-  const _name = Symbol("[[name]]");
-  const _adapter = Symbol("[[adapter]]");
-  const _cleanup = Symbol("[[cleanup]]");
-
   /**
    * @typedef InnerGPUAdapter
    * @property {number} rid
@@ -320,8 +342,6 @@
       }`;
     }
   }
-
-  const _limits = Symbol("[[limits]]");
 
   function createGPUSupportedLimits(features) {
     /** @type {GPUSupportedLimits} */
@@ -477,8 +497,6 @@
     }
   }
 
-  const _features = Symbol("[[features]]");
-
   function createGPUSupportedFeatures(features) {
     /** @type {GPUSupportedFeatures} */
     const adapterFeatures = webidl.createBranded(GPUSupportedFeatures);
@@ -540,9 +558,6 @@
     }
   }
 
-  const _reason = Symbol("[[reason]]");
-  const _message = Symbol("[[message]]");
-
   /**
    *
    * @param {string | undefined} reason
@@ -583,8 +598,6 @@
     }
   }
 
-  const _label = Symbol("[[label]]");
-
   /**
    * @param {string} name
    * @param {any} type
@@ -612,10 +625,6 @@
       },
     });
   }
-
-  const _validConfiguration = Symbol("[[validConfiguration]]");
-  const _configuration = Symbol("[[configuration]]");
-  const _currentTexture = Symbol("[[currentTexture]]");
 
   class GPUCanvasContext {
     /** @type {number} */
@@ -754,9 +763,6 @@
       // TODO
     }
   }
-
-  const _device = Symbol("[[device]]");
-  const _queue = Symbol("[[queue]]");
 
   /**
    * @typedef ErrorScope
@@ -1751,15 +1757,6 @@
   }
   GPUObjectBaseMixin("GPUQueue", GPUQueue);
 
-  const _rid = Symbol("[[rid]]");
-
-  const _size = Symbol("[[size]]");
-  const _usage = Symbol("[[usage]]");
-  const _state = Symbol("[[state]]");
-  const _mappingRange = Symbol("[[mapping_range]]");
-  const _mappedRanges = Symbol("[[mapped_ranges]]");
-  const _mapMode = Symbol("[[map_mode]]");
-
   /**
    * @typedef CreateGPUBufferOptions
    * @property {ArrayBuffer | null} mapping
@@ -2124,8 +2121,6 @@
     }
   }
 
-  const _views = Symbol("[[views]]");
-
   /**
    * @param {string | null} label
    * @param {InnerGPUDevice} device
@@ -2234,8 +2229,6 @@
       return 0x10;
     }
   }
-
-  const _texture = Symbol("[[texture]]");
 
   /**
    * @param {string | null} label
@@ -2689,8 +2682,6 @@
       return 0xF;
     }
   }
-
-  const _encoders = Symbol("[[encoders]]");
 
   /**
    * @param {string | null} label
@@ -3476,8 +3467,6 @@
     }
   }
   GPUObjectBaseMixin("GPUCommandEncoder", GPUCommandEncoder);
-
-  const _encoder = Symbol("[[encoder]]");
 
   /**
    * @param {string | null} label
@@ -5212,8 +5201,6 @@
     }
   }
   GPUObjectBaseMixin("GPURenderBundle", GPURenderBundle);
-
-  const _descriptor = Symbol("[[descriptor]]");
 
   /**
    * @param {string | null} label
