@@ -1,6 +1,6 @@
-// Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2021 the Deno authors. All rights reserved. MIT license.
 
-// @ts-check
+// @ts-dont-check
 /// <reference path="../../core/lib.deno_core.d.ts" />
 /// <reference path="../web/internal.d.ts" />
 /// <reference path="../web/lib.deno_web.d.ts" />
@@ -219,10 +219,10 @@
    */
 
   /**
-   * @param {string} name
-   * @param {InnerGPUAdapter} inner
-   * @returns {GPUAdapter}
-   */
+    * @param {string} name
+    * @param {InnerGPUAdapter} inner
+    * @returns {GPUAdapter}
+    */
   function createGPUAdapter(name, inner) {
     /** @type {GPUAdapter} */
     const adapter = webidl.createBranded(GPUAdapter);
@@ -291,7 +291,7 @@
         "op_webgpu_request_device",
         {
           adapterRid: this[_adapter].rid,
-          labe: descriptor.label,
+          label: descriptor.label,
           requiredFeatures,
           requiredLimits,
         },
@@ -544,6 +544,7 @@
   const _message = Symbol("[[message]]");
 
   /**
+   *
    * @param {string | undefined} reason
    * @param {string} message
    * @returns {GPUDeviceLostInfo}
@@ -610,6 +611,148 @@
         this[_label] = label;
       },
     });
+  }
+
+  const _validConfiguration = Symbol("[[validConfiguration]]");
+  const _configuration = Symbol("[[configuration]]");
+  const _currentTexture = Symbol("[[currentTexture]]");
+
+  class GPUCanvasContext {
+    /** @type {number} */
+    [_rid];
+
+    // TODO: Canvas
+    /** @type {any} */
+    canvas;
+
+    /** @type {boolean} */
+    [_validConfiguration];
+    /** @type {GPUCanvasConfiguration} */
+    [_configuration];
+    /** @type {GPUExtent3D} */
+    [_size];
+    /** @type {GPUTexture | null} */
+    [_currentTexture];
+
+    constructor() {
+      webidl.illegalConstructor();
+    }
+
+    /**
+     * 
+     * @param {GPUCanvasConfiguration} configuration 
+     */
+    configure(configuration) {
+      webidl.assertBranded(this, GPUCanvasContext);
+      const prefix = "Failed to execute 'configure' on 'GPUCanvasContext'";
+
+      configuration = webidl.converters.GPUCanvasConfiguration(configuration, {
+        prefix,
+        context: "Argument 1",
+      });
+      
+      this[_validConfiguration] = false;
+      
+      this[_configuration] = configuration;
+      
+      if (this[_currentTexture] !== null) {
+        this[_currentTexture].destroy();
+      }
+
+      this[_currentTexture] = null;
+      
+      const device = configuration.device;
+      const canvas = this.canvas;
+      
+      if (configuration.size === undefined) {
+        this[_size] = [canvas.width, canvas.height, 1];
+      } else {
+        this[_size] = configuration.size;
+      }
+
+      const size = this[_size];
+      const width = size instanceof Array ? size[0] : size.width;
+      const height = size instanceof Array ? size[1] : size.height;
+      const depthOrArrayLayers = size instanceof Array ? size[2] : size.depthOrArrayLayers;
+
+      {
+        let error;
+
+        // TODO: How to check this:
+        // "Supported context formats contains configuration.format."
+
+        if (device[_device].isLost) {
+          error = "'GPUDevice' has been lost.";
+        } else if (
+          width <= 0 ||
+          height <- 0 ||
+          width > device.limits.maxTextureDimension2D ||
+          height > device.limits.maxTextureDimension2D ||
+          depthOrArrayLayers !== 1
+        ) {
+          error = "Invalid 'size' of 'GPUCanvasConfiguration'";
+        }
+
+        if (error) {
+          device[_device].pushError({
+            type: "validation",
+            value: error,
+          });
+          return;
+        }
+      }
+
+      core.opSync(
+        "op_webgpu_configure_surface",
+        {
+          deviceRid: device[_device].rid,
+          surfaceRid: this[_rid],
+          format: this[_configuration].format,
+          usage: this[_configuration].usage,
+          width,
+          height,
+          // TODO: wgpu doesn't support these
+          // colorSpace,
+          // compositingAlphaMode,
+        },
+      );
+
+      this[_validConfiguration] = true;
+    }
+
+    unconfigure() {
+      // https://github.com/gfx-rs/wgpu/pull/2279#issuecomment-991951895
+      webidl.assertBranded(this, GPUCanvasContext);
+
+      this[_validConfiguration] = false;
+      this[_configuration] = null;
+
+      if (this[_currentTexture] !== null) {
+        this[_currentTexture].destroy();
+      }
+
+      this[_currentTexture] = null;
+    }
+
+    /**
+     * @param {GPUAdapter} adapter 
+     * @returns {GPUTextureFormat}
+     */
+    getPreferredFormat(adapter) {
+      webidl.assertBranded(adapter, GPUAdapter);
+      return core.opSync(
+        "op_webgpu_surface_get_preferred_format",
+        {
+          adapterRid: adapter[_adapter].rid,
+          surfaceRid: this[_rid],
+        },
+      );
+    }
+
+    getCurrentTexture() {
+      webidl.assertBranded(this, GPUCanvasContext);
+      // TODO
+    }
   }
 
   const _device = Symbol("[[device]]");
@@ -849,7 +992,7 @@
         descriptor.usage,
         options,
       );
-      device.trackResource(buffer);
+      device.trackResource((buffer));
       return buffer;
     }
 
@@ -878,7 +1021,7 @@
         device,
         rid,
       );
-      device.trackResource(texture);
+      device.trackResource((texture));
       return texture;
     }
 
@@ -905,7 +1048,7 @@
         device,
         rid,
       );
-      device.trackResource(sampler);
+      device.trackResource((sampler));
       return sampler;
     }
 
@@ -948,7 +1091,7 @@
         device,
         rid,
       );
-      device.trackResource(bindGroupLayout);
+      device.trackResource((bindGroupLayout));
       return bindGroupLayout;
     }
 
@@ -990,7 +1133,7 @@
         device,
         rid,
       );
-      device.trackResource(pipelineLayout);
+      device.trackResource((pipelineLayout));
       return pipelineLayout;
     }
 
@@ -1083,7 +1226,7 @@
         device,
         rid,
       );
-      device.trackResource(bindGroup);
+      device.trackResource((bindGroup));
       return bindGroup;
     }
 
@@ -1115,7 +1258,7 @@
         device,
         rid,
       );
-      device.trackResource(shaderModule);
+      device.trackResource((shaderModule));
       return shaderModule;
     }
 
@@ -1172,7 +1315,7 @@
         device,
         rid,
       );
-      device.trackResource(computePipeline);
+      device.trackResource((computePipeline));
       return computePipeline;
     }
 
@@ -1247,7 +1390,7 @@
         device,
         rid,
       );
-      device.trackResource(renderPipeline);
+      device.trackResource((renderPipeline));
       return renderPipeline;
     }
 
@@ -1284,7 +1427,7 @@
         device,
         rid,
       );
-      device.trackResource(commandEncoder);
+      device.trackResource((commandEncoder));
       return commandEncoder;
     }
 
@@ -1319,7 +1462,7 @@
         device,
         rid,
       );
-      device.trackResource(renderBundleEncoder);
+      device.trackResource((renderBundleEncoder));
       return renderBundleEncoder;
     }
 
@@ -1351,7 +1494,7 @@
         rid,
         descriptor,
       );
-      device.trackResource(querySet);
+      device.trackResource((querySet));
       return querySet;
     }
 
@@ -2268,8 +2411,8 @@
 
   /**
    * @param {string | null} label
-   * @param {InnerGPUDevice} device
-   * @param {number} rid
+    * @param {InnerGPUDevice} device
+  * @param {number} rid
    * @returns {GPUBindGroup}
    */
   function createGPUBindGroup(label, device, rid) {
@@ -2311,8 +2454,8 @@
 
   /**
    * @param {string | null} label
-   * @param {InnerGPUDevice} device
-   * @param {number} rid
+    * @param {InnerGPUDevice} device
+  * @param {number} rid
    * @returns {GPUShaderModule}
    */
   function createGPUShaderModule(label, device, rid) {
@@ -2436,7 +2579,7 @@
         device,
         rid,
       );
-      device.trackResource(bindGroupLayout);
+      device.trackResource((bindGroupLayout));
       return bindGroupLayout;
     }
 
@@ -2511,7 +2654,7 @@
         device,
         rid,
       );
-      device.trackResource(bindGroupLayout);
+      device.trackResource((bindGroupLayout));
       return bindGroupLayout;
     }
 
@@ -3067,7 +3210,8 @@
      */
     clearBuffer(destination, destinationOffset, size) {
       webidl.assertBranded(this, GPUCommandEncoder);
-      const prefix = "Failed to execute 'clearBuffer' on 'GPUCommandEncoder'";
+      const prefix =
+        "Failed to execute 'clearBuffer' on 'GPUCommandEncoder'";
       webidl.requiredArguments(arguments.length, 3, { prefix });
       destination = webidl.converters.GPUBuffer(destination, {
         prefix,
@@ -3319,7 +3463,7 @@
         device,
         rid,
       );
-      device.trackResource(commandBuffer);
+      device.trackResource((commandBuffer));
       return commandBuffer;
     }
 
@@ -3418,6 +3562,7 @@
     }
 
     /**
+     *
      * @param {number} x
      * @param {number} y
      * @param {number} width
@@ -4643,7 +4788,7 @@
         device,
         rid,
       );
-      device.trackResource(renderBundle);
+      device.trackResource((renderBundle));
       return renderBundle;
     }
 
@@ -5128,6 +5273,7 @@
     GPUAdapter,
     GPUSupportedLimits,
     GPUSupportedFeatures,
+    GPUCanvasContext,
     GPUDevice,
     GPUQueue,
     GPUBuffer,
