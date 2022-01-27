@@ -6,13 +6,11 @@ use std::io::ErrorKind;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
 use std::slice;
-use winapi::shared::minwindef::DWORD;
 use winapi::shared::minwindef::HMODULE;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::libloaderapi::FreeLibrary;
 use winapi::um::libloaderapi::GetProcAddress;
 use winapi::um::libloaderapi::LoadLibraryExW;
-use winapi::um::winnt::WCHAR;
 
 pub type Handle = HMODULE;
 
@@ -31,7 +29,7 @@ unsafe fn get_win_error() -> IoError {
 #[inline]
 pub unsafe fn dlopen(name: &OsStr, flags: u32) -> Result<Handle, Error> {
   let wide_name: Vec<u16> = name.encode_wide().chain(Some(0)).collect();
-  let handle = LoadLibraryExW(wide_name.as_ptr(), std::ptr::null(), flags);
+  let handle = LoadLibraryExW(wide_name.as_ptr(), null_mut(), flags);
   if handle.is_null() {
     Err(Error::OpenLibrary(get_win_error()))
   } else {
