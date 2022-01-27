@@ -5,7 +5,6 @@ use std::io::Error as IoError;
 use std::io::ErrorKind;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
-use std::slice;
 use winapi::shared::minwindef::HMODULE;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::libloaderapi::FreeLibrary;

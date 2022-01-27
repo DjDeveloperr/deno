@@ -858,10 +858,10 @@ mod tests {
   #[test]
   fn test_format_error() {
     use super::format_error;
+    use crate::error::Error;
 
     // BAD_EXE_FORMAT
-    let err =
-      error::Error::OpenLibrary(std::io::Error::from_raw_os_error(0x000000C1));
+    let err = Error::OpenLibrary(std::io::Error::from_raw_os_error(0x000000C1));
     assert_eq!(
       format_error(err, "foo.dll".to_string()),
       "foo.dll is not a valid Win32 application.\r\n".to_string(),

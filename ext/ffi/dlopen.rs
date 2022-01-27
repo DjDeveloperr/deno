@@ -14,6 +14,7 @@ use std::os::raw::c_void;
 pub struct Library(raw::Handle);
 
 impl Library {
+  #[allow(unused_mut)]
   pub fn open<S>(name: S, mut flags: u32) -> Result<Library, Error>
   where
     S: AsRef<OsStr>,
