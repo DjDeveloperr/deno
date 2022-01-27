@@ -860,7 +860,7 @@ mod tests {
     use super::format_error;
 
     // BAD_EXE_FORMAT
-    let err = dlopen::Error::OpeningLibraryError(
+    let err = error::Error::OpeningLibraryError(
       std::io::Error::from_raw_os_error(0x000000C1),
     );
     assert_eq!(
