@@ -224,8 +224,8 @@
     #rid;
     symbols = {};
 
-    constructor(path, symbols) {
-      this.#rid = core.opSync("op_ffi_load", { path, symbols });
+    constructor(path, symbols, flags) {
+      this.#rid = core.opSync("op_ffi_load", { path, symbols, flags });
 
       for (const symbol in symbols) {
         const isNonBlocking = symbols[symbol].nonblocking;
@@ -272,10 +272,10 @@
     }
   }
 
-  function dlopen(path, symbols) {
+  function dlopen(path, symbols, flags = 0) {
     // URL support is progressively enhanced by util in `runtime/js`.
     const pathFromURL = __bootstrap.util.pathFromURL ?? ((p) => p);
-    return new DynamicLibrary(pathFromURL(path), symbols);
+    return new DynamicLibrary(pathFromURL(path), symbols, flags);
   }
 
   window.__bootstrap.ffi = {

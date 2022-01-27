@@ -918,7 +918,7 @@ name = "deno_ffi"
 version = "0.21.0"
 dependencies = [
  "deno_core",
- "dlopen",
+ "libc",
  "libffi",
  "serde",
  "tokio",

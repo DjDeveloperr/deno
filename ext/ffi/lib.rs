@@ -16,20 +16,27 @@ use deno_core::OpState;
 use deno_core::Resource;
 use deno_core::ResourceId;
 use deno_core::ZeroCopyBuf;
-use dlopen::raw::Library;
 use libffi::middle::Arg;
 use serde::Deserialize;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ffi::c_void;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::path::Path;
 use std::path::PathBuf;
 use std::ptr;
 use std::rc::Rc;
+
+mod dlopen;
+mod error;
+#[cfg(unix)]
+mod unix;
+#[cfg(not(unix))]
+mod windows;
+
+use crate::dlopen::Library;
 
 pub struct Unstable(pub bool);
 
@@ -89,7 +96,7 @@ impl DynamicLibraryResource {
     // By default, Err returned by this function does not tell
     // which symbol wasn't exported. So we'll modify the error
     // message to include the name of symbol.
-    let fn_ptr = match unsafe { self.lib.symbol::<*const c_void>(symbol) } {
+    let fn_ptr = match self.lib.symbol(symbol) {
       Ok(value) => Ok(value),
       Err(err) => Err(generic_error(format!(
         "Failed to register symbol {}: {}",
@@ -355,11 +362,12 @@ struct ForeignFunction {
 struct FfiLoadArgs {
   path: String,
   symbols: HashMap<String, ForeignFunction>,
+  flags: u32,
 }
 
 // `path` is only used on Windows.
 #[allow(unused_variables)]
-pub(crate) fn format_error(e: dlopen::Error, path: String) -> String {
+pub(crate) fn format_error(e: error::Error, path: String) -> String {
   match e {
     #[cfg(target_os = "windows")]
     // This calls FormatMessageW with library path
@@ -368,7 +376,7 @@ pub(crate) fn format_error(e: dlopen::Error, path: String) -> String {
     // flag without any arguments.
     //
     // https://github.com/denoland/deno/issues/11632
-    dlopen::Error::OpeningLibraryError(e) => {
+    error::Error::OpenLibrary(e) => {
       use std::ffi::OsStr;
       use std::os::windows::ffi::OsStrExt;
       use winapi::shared::minwindef::DWORD;
@@ -446,12 +454,8 @@ where
   let permissions = state.borrow_mut::<FP>();
   permissions.check(Some(&PathBuf::from(&path)))?;
 
-  let lib = Library::open(&path).map_err(|e| {
-    dlopen::Error::OpeningLibraryError(std::io::Error::new(
-      std::io::ErrorKind::Other,
-      format_error(e, path),
-    ))
-  })?;
+  let lib = Library::open(&path, args.flags)
+    .map_err(|e| generic_error(format_error(e, path)))?;
 
   let mut resource = DynamicLibraryResource {
     lib,
