@@ -888,12 +888,12 @@ where
           } else {
             &backing_store[..] as *const _ as *const u8
           };
-          ffi_args.push(NativeValue { pointer: pointer });
+          ffi_args.push(NativeValue { pointer });
         } else if let Ok(value) = v8::Local::<v8::ArrayBuffer>::try_from(value)
         {
           let backing_store = value.get_backing_store();
           let pointer = &backing_store[..] as *const _ as *const u8;
-          ffi_args.push(NativeValue { pointer: pointer });
+          ffi_args.push(NativeValue { pointer });
         } else {
           return Err(type_error("Invalid FFI structure type, expected ArrayBuffer, or ArrayBufferView"));
         }
@@ -1106,13 +1106,13 @@ where
             &backing_store[..] as *const _ as *const u8
           };
 
-          ffi_args.push(NativeValue { pointer: pointer });
+          ffi_args.push(NativeValue { pointer });
         } else if let Ok(value) = v8::Local::<v8::ArrayBuffer>::try_from(value)
         {
           let backing_store = value.get_backing_store();
           let pointer = &backing_store[..] as *const _ as *const u8;
 
-          ffi_args.push(NativeValue { pointer: pointer });
+          ffi_args.push(NativeValue { pointer });
         } else {
           return Err(type_error(
             "Invalid structure type, expected ArrayBuffer, or ArrayBufferView",
