@@ -309,7 +309,6 @@ union NativeValue {
   f32_value: f32,
   f64_value: f64,
   pointer: *const u8,
-  structure: *const u8,
   structure_value: std::mem::ManuallyDrop<Vec<u8>>,
 }
 
@@ -330,7 +329,7 @@ impl NativeValue {
       NativeType::F32 => Arg::new(&self.f32_value),
       NativeType::F64 => Arg::new(&self.f64_value),
       NativeType::Pointer | NativeType::Function => Arg::new(&self.pointer),
-      NativeType::Struct(_) => Arg::new(&*self.structure),
+      NativeType::Struct(_) => Arg::new(&*self.pointer),
     }
   }
 
@@ -889,12 +888,12 @@ where
           } else {
             &backing_store[..] as *const _ as *const u8
           };
-          ffi_args.push(NativeValue { structure: pointer });
+          ffi_args.push(NativeValue { pointer: pointer });
         } else if let Ok(value) = v8::Local::<v8::ArrayBuffer>::try_from(value)
         {
           let backing_store = value.get_backing_store();
           let pointer = &backing_store[..] as *const _ as *const u8;
-          ffi_args.push(NativeValue { structure: pointer });
+          ffi_args.push(NativeValue { pointer: pointer });
         } else {
           return Err(type_error("Invalid FFI structure type, expected ArrayBuffer, or ArrayBufferView"));
         }
@@ -1107,13 +1106,13 @@ where
             &backing_store[..] as *const _ as *const u8
           };
 
-          ffi_args.push(NativeValue { structure: pointer });
+          ffi_args.push(NativeValue { pointer: pointer });
         } else if let Ok(value) = v8::Local::<v8::ArrayBuffer>::try_from(value)
         {
           let backing_store = value.get_backing_store();
           let pointer = &backing_store[..] as *const _ as *const u8;
 
-          ffi_args.push(NativeValue { structure: pointer });
+          ffi_args.push(NativeValue { pointer: pointer });
         } else {
           return Err(type_error(
             "Invalid structure type, expected ArrayBuffer, or ArrayBufferView",
