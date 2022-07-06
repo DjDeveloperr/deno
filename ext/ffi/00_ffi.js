@@ -5,6 +5,7 @@
   const core = window.Deno.core;
   const __bootstrap = window.__bootstrap;
   const {
+    ArrayIsArray,
     BigInt,
     ObjectDefineProperty,
     ObjectPrototypeIsPrototypeOf,
@@ -132,20 +133,17 @@
   }
 
   function unpackNonblockingReturnValue(type, result) {
-    if (
-      typeof type === "object" && type !== null && "function" in type ||
-      type === "pointer"
-    ) {
-      return unpackU64(result);
-    }
     switch (type) {
       case "isize":
       case "i64":
         return unpackI64(result);
       case "usize":
+      case "pointer":
+      case "function":
       case "u64":
         return unpackU64(result);
       default:
+        if (ArrayIsArray(result)) return new Uint8Array(result);
         return result;
     }
   }
@@ -170,7 +168,7 @@
         );
 
         if (
-          isReturnedAsBigInt(resultType)
+          isReturnedAsBigInt(resultType) || isStructType(resultType)
         ) {
           return PromisePrototypeThen(
             promise,
@@ -191,13 +189,16 @@
   }
 
   function isPointerType(type) {
-    return type === "pointer" ||
-      typeof type === "object" && type !== null && "function" in type;
+    return type === "pointer" || type === "function";
   }
 
   function isReturnedAsBigInt(type) {
     return isPointerType(type) || type === "u64" || type === "i64" ||
       type === "usize" || type === "isize";
+  }
+
+  function isStructType(type) {
+    return typeof type === "object" && type !== null && "struct" in type;
   }
 
   class UnsafeCallback {
@@ -286,7 +287,8 @@
         const isNonBlocking = symbols[symbol].nonblocking;
         if (isNonBlocking) {
           const resultType = symbols[symbol].result;
-          const needsUnpacking = isReturnedAsBigInt(resultType);
+          const needsUnpacking = isReturnedAsBigInt(resultType) ||
+            isStructType(resultType);
           ObjectDefineProperty(
             this.symbols,
             symbol,

@@ -309,7 +309,7 @@ union NativeValue {
   f32_value: f32,
   f64_value: f64,
   pointer: *const u8,
-  structure_value: std::mem::ManuallyDrop<Vec<u8>>,
+  structure_value: *mut [u8],
 }
 
 impl NativeValue {
@@ -361,7 +361,8 @@ impl NativeValue {
         json!(U32x2::from(self.pointer as u64))
       }
       NativeType::Struct(_) => {
-        json!(self.structure_value.to_vec())
+        let v = Box::from_raw(self.structure_value);
+        json!(v)
       }
     }
   }
@@ -444,8 +445,8 @@ impl NativeValue {
         local_value.into()
       }
       NativeType::Struct(_) => {
-        let store = v8::ArrayBuffer::new_backing_store_from_vec(
-          self.structure_value.to_vec(),
+        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(
+          Box::from_raw(self.structure_value),
         );
         let ab =
           v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
@@ -1190,7 +1191,7 @@ where
       },
       NativeType::Struct(fields) => {
         let size = NativeType::compute_struct_size(fields);
-        let mut result = vec![0u8; size];
+        let mut result = vec![0u8; size].into_boxed_slice();
         libffi::raw::ffi_call(
           symbol.cif.as_raw_ptr(),
           Some(*symbol.ptr.as_safe_fun()),
@@ -1198,7 +1199,7 @@ where
           call_args.as_ptr() as *mut *mut c_void,
         );
         NativeValue {
-          structure_value: std::mem::ManuallyDrop::new(result),
+          structure_value: Box::into_raw(result),
         }
       }
     })
@@ -1269,7 +1270,7 @@ fn ffi_call(
       },
       NativeType::Struct(fields) => {
         let size = NativeType::compute_struct_size(&fields);
-        let mut result = vec![0u8; size];
+        let mut result = vec![0u8; size].into_boxed_slice();
         libffi::raw::ffi_call(
           cif.as_raw_ptr(),
           Some(*fun_ptr.as_safe_fun()),
@@ -1277,7 +1278,7 @@ fn ffi_call(
           call_args.as_ptr() as *mut *mut c_void,
         );
         NativeValue {
-          structure_value: std::mem::ManuallyDrop::new(result),
+          structure_value: Box::into_raw(result),
         }
       }
     })

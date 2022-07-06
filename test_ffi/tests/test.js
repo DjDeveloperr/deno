@@ -185,6 +185,12 @@ const dylib = Deno.dlopen(libPath, {
     parameters: ["f64", "f64", "f64", "f64"],
     result: { struct: Rect },
   },
+  "make_rect_async": {
+    name: "make_rect",
+    nonblocking: true,
+    parameters: ["f64", "f64", "f64", "f64"],
+    result: { struct: Rect },
+  },
   "print_rect": {
     parameters: [{ struct: Rect }],
     result: "void",
@@ -430,10 +436,10 @@ console.log(
 const view = new Deno.UnsafePointerView(dylib.symbols.static_ptr);
 console.log("Static ptr value:", view.getUint32());
 
-const rect = dylib.symbols.make_rect(10, 20, 100, 200);
+let rect = dylib.symbols.make_rect(10, 20, 100, 200);
 dylib.symbols.print_rect(rect);
-// Ensure that `rect` backing memory was not deallocated by Rust in FFI call.
-console.log(rect);
+rect = await dylib.symbols.make_rect_async(10, 20, 100, 200);
+console.log(rect instanceof Uint8Array);
 
 (function cleanup() {
   dylib.close();
