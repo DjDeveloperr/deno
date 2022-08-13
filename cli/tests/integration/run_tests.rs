@@ -2754,6 +2754,12 @@ itest!(custom_inspect_url {
   output: "custom_inspect_url.js.out",
 });
 
+itest!(config_json_import {
+  args: "run --quiet -c jsx/deno-jsx.json config_json_import.ts",
+  output: "config_json_import.ts.out",
+  http_server: true,
+});
+
 #[test]
 fn running_declaration_files() {
   let temp_dir = TempDir::new();
@@ -2784,6 +2790,17 @@ itest!(followup_dyn_import_resolved {
 });
 
 itest!(unhandled_rejection {
-  args: "run --allow-read unhandled_rejection.js",
-  output: "unhandled_rejection.js.out",
+  args: "run --check unhandled_rejection.ts",
+  output: "unhandled_rejection.ts.out",
+});
+
+itest!(unhandled_rejection_sync_error {
+  args: "run --check unhandled_rejection_sync_error.ts",
+  output: "unhandled_rejection_sync_error.ts.out",
+});
+
+itest!(nested_error {
+  args: "run nested_error.ts",
+  output: "nested_error.ts.out",
+  exit_code: 1,
 });
