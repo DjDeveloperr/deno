@@ -23,6 +23,7 @@ use dlopen::raw::Library;
 use libffi::middle::Arg;
 use libffi::middle::Cif;
 use serde::Deserialize;
+use std::alloc::Layout;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -276,16 +277,38 @@ impl NativeType {
       | NativeType::Pointer
       | NativeType::Function
       | NativeType::Buffer => std::mem::size_of::<usize>(),
-      NativeType::Struct(fields) => NativeType::compute_struct_size(fields),
+      NativeType::Struct(_) => self.as_layout().size(),
     }
   }
 
-  fn compute_struct_size(fields: &[NativeType]) -> usize {
-    let mut size = 0;
-    for field in fields {
-      size += field.get_size();
+  fn as_layout(&self) -> Layout {
+    match self {
+      NativeType::Void => Layout::new::<()>(),
+      NativeType::U8 => Layout::new::<u8>(),
+      NativeType::I8 => Layout::new::<i8>(),
+      NativeType::U16 => Layout::new::<u16>(),
+      NativeType::I16 => Layout::new::<i16>(),
+      NativeType::U32 => Layout::new::<u32>(),
+      NativeType::I32 => Layout::new::<i32>(),
+      NativeType::U64 => Layout::new::<u64>(),
+      NativeType::I64 => Layout::new::<i64>(),
+      NativeType::USize => Layout::new::<usize>(),
+      NativeType::ISize => Layout::new::<isize>(),
+      NativeType::F32 => Layout::new::<f32>(),
+      NativeType::F64 => Layout::new::<f64>(),
+      NativeType::Pointer => Layout::new::<usize>(),
+      NativeType::Buffer => Layout::new::<usize>(),
+      NativeType::Function => Layout::new::<usize>(),
+      NativeType::Struct(fields) => {
+        let mut layout = Layout::from_size_align(0, 1).unwrap();
+        for field in fields {
+          let (new_layout, _) = layout.extend(field.as_layout()).unwrap();
+          layout = new_layout;
+        }
+        layout.pad_to_align()
+      }
+      NativeType::Bool => Layout::new::<bool>(),
     }
-    size
   }
 }
 
@@ -356,14 +379,7 @@ impl NativeValue {
       NativeType::Pointer | NativeType::Buffer | NativeType::Function => {
         Arg::new(&self.pointer)
       }
-      NativeType::Struct(_) => {
-        let boxed = Box::from_raw(self.struct_value);
-        let arg = Arg::new(&*boxed.as_ptr());
-        // Leak the box since libffi will take ownership of the
-        // struct memory.
-        let _ = Box::leak(boxed);
-        arg
-      }
+      NativeType::Struct(_) => Arg::new(&*self.pointer),
     }
   }
 
@@ -1085,10 +1101,8 @@ fn ffi_parse_struct_arg(
   scope: &mut v8::HandleScope,
   arg: v8::Local<v8::Value>,
 ) -> Result<NativeValue, AnyError> {
-  let size: usize;
   let pointer = if let Ok(value) = v8::Local::<v8::ArrayBuffer>::try_from(arg) {
     let backing_store = value.get_backing_store();
-    size = backing_store.byte_length();
     &backing_store[..] as *const _ as *const u8
   } else if let Ok(value) = v8::Local::<v8::ArrayBufferView>::try_from(arg) {
     let byte_offset = value.byte_offset();
@@ -1098,19 +1112,13 @@ fn ffi_parse_struct_arg(
         type_error("Invalid FFI ArrayBufferView, expected data in the buffer")
       })?
       .get_backing_store();
-    size = backing_store.byte_length() - byte_offset;
     &backing_store[byte_offset..] as *const _ as *const u8
   } else {
     return Err(type_error(
       "Invalid FFI buffer type, expected null, ArrayBuffer, or ArrayBufferView",
     ));
   };
-  // SAFETY: The pointer is valid for the lifetime of the backing store.
-  let slice = unsafe { std::slice::from_raw_parts(pointer, size) };
-  let boxed = slice.to_vec().into_boxed_slice();
-  Ok(NativeValue {
-    struct_value: Box::into_raw(boxed),
-  })
+  Ok(NativeValue { pointer })
 }
 
 #[inline]
@@ -1351,8 +1359,8 @@ where
           pointer: cif.call::<*mut c_void>(*fun_ptr, &call_args),
         }
       }
-      NativeType::Struct(fields) => {
-        let size = NativeType::compute_struct_size(fields);
+      NativeType::Struct(_) => {
+        let size = result_type.get_size();
         let mut result = vec![0u8; size].into_boxed_slice();
         libffi::raw::ffi_call(
           symbol.cif.as_raw_ptr(),
@@ -1435,8 +1443,8 @@ fn ffi_call(
           pointer: cif.call::<*mut c_void>(fun_ptr, &call_args),
         }
       }
-      NativeType::Struct(fields) => {
-        let size = NativeType::compute_struct_size(&fields);
+      NativeType::Struct(_) => {
+        let size = result_type.get_size();
         let mut result = vec![0u8; size].into_boxed_slice();
         libffi::raw::ffi_call(
           cif.as_raw_ptr(),
@@ -1616,8 +1624,8 @@ unsafe fn do_ffi_callback(
           v8::Number::new(scope, result as f64).into()
         }
       }
-      NativeType::Struct(fields) => {
-        let size = NativeType::compute_struct_size(fields);
+      NativeType::Struct(_) => {
+        let size = native_type.get_size();
         let ptr = (*val) as *const u8;
         let slice = std::slice::from_raw_parts(ptr, size);
         let boxed = slice.to_vec().into_boxed_slice();
@@ -2051,6 +2059,9 @@ fn op_ffi_get_static<'scope>(
     NativeType::Void => {
       return Err(type_error("Invalid FFI static type 'void'"));
     }
+    NativeType::Struct(_) => {
+      return Err(type_error("Invalid FFI static type 'struct'"));
+    }
     NativeType::Bool => {
       // SAFETY: ptr is user provided
       let result = unsafe { ptr::read_unaligned(data_ptr as *const bool) };
@@ -2164,20 +2175,6 @@ fn op_ffi_get_static<'scope>(
         v8::Number::new(scope, result as f64).into()
       };
       integer.into()
-    }
-    NativeType::Struct(fields) => {
-      let size = NativeType::compute_struct_size(&fields);
-      let slice =
-        // SAFETY: Let's assume the symbol points to a valid struct
-        unsafe { std::slice::from_raw_parts(data_ptr as *const u8, size) };
-      let boxed = slice.to_vec().into_boxed_slice();
-      let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(boxed);
-      let ab = v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
-      let local_value: v8::Local<v8::Value> =
-        v8::Uint8Array::new(scope, ab, 0, ab.byte_length())
-          .unwrap()
-          .into();
-      local_value.into()
     }
   })
 }

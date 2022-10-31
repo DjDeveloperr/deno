@@ -169,9 +169,9 @@ impl SysVAmd64 {
     let mut compiler = Self::new();
 
     let must_cast_return_value =
-      compiler.must_cast_return_value(sym.result_type.clone());
+      compiler.must_cast_return_value(&sym.result_type);
     let must_wrap_return_value =
-      compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone());
+      compiler.must_wrap_return_value_in_typed_array(&sym.result_type);
     let must_save_preserved_register = must_wrap_return_value;
     let cannot_tailcall = must_cast_return_value || must_wrap_return_value;
 
@@ -558,7 +558,7 @@ impl SysVAmd64 {
     self.integral_params > 0
   }
 
-  fn must_cast_return_value(&self, rv: NativeType) -> bool {
+  fn must_cast_return_value(&self, rv: &NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 8 and 16 bit integers by extending them to 32 bits in the trampoline before returning
     matches!(
@@ -567,10 +567,10 @@ impl SysVAmd64 {
     )
   }
 
-  fn must_wrap_return_value_in_typed_array(&self, rv: NativeType) -> bool {
+  fn must_wrap_return_value_in_typed_array(&self, rv: &NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 64 bit integers by wrapping them in a TypedArray out parameter
-    crate::needs_unwrap(&rv)
+    crate::needs_unwrap(rv)
   }
 
   fn finalize(self) -> ExecutableBuffer {
@@ -615,7 +615,7 @@ impl Aarch64Apple {
     let mut compiler = Self::new();
 
     let must_wrap_return_value =
-      compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone());
+      compiler.must_wrap_return_value_in_typed_array(&sym.result_type);
     let must_save_preserved_register = must_wrap_return_value;
     let cannot_tailcall = must_wrap_return_value;
 
@@ -634,7 +634,7 @@ impl Aarch64Apple {
       // the receiver object should never be expected. Avoid its unexpected or deliberate leak
       compiler.zero_first_arg();
     }
-    if compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone()) {
+    if compiler.must_wrap_return_value_in_typed_array(&sym.result_type) {
       compiler.save_out_array_to_preserved_register();
     }
 
@@ -1075,10 +1075,10 @@ impl Aarch64Apple {
   }
 
   fn must_save_preserved_register_to_stack(&mut self, symbol: &Symbol) -> bool {
-    self.must_wrap_return_value_in_typed_array(symbol.result_type.clone())
+    self.must_wrap_return_value_in_typed_array(&symbol.result_type)
   }
 
-  fn must_wrap_return_value_in_typed_array(&self, rv: NativeType) -> bool {
+  fn must_wrap_return_value_in_typed_array(&self, rv: &NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 64 bit integers by wrapping them in a TypedArray out parameter
     crate::needs_unwrap(&rv)
@@ -1126,9 +1126,9 @@ impl Win64 {
     let mut compiler = Self::new();
 
     let must_cast_return_value =
-      compiler.must_cast_return_value(sym.result_type.clone());
+      compiler.must_cast_return_value(&sym.result_type);
     let must_wrap_return_value =
-      compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone());
+      compiler.must_wrap_return_value_in_typed_array(&sym.result_type);
     let must_save_preserved_register = must_wrap_return_value;
     let cannot_tailcall = must_cast_return_value || must_wrap_return_value;
 
@@ -1425,7 +1425,7 @@ impl Win64 {
     self.params > 0
   }
 
-  fn must_cast_return_value(&self, rv: NativeType) -> bool {
+  fn must_cast_return_value(&self, rv: &NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 8 and 16 bit integers by extending them to 32 bits in the trampoline before returning
     matches!(
@@ -1434,10 +1434,10 @@ impl Win64 {
     )
   }
 
-  fn must_wrap_return_value_in_typed_array(&self, rv: NativeType) -> bool {
+  fn must_wrap_return_value_in_typed_array(&self, rv: &NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 64 bit integers by wrapping them in a TypedArray out parameter
-    crate::needs_unwrap(&rv)
+    crate::needs_unwrap(rv)
   }
 
   fn finalize(self) -> ExecutableBuffer {
