@@ -19,6 +19,11 @@ pub(crate) fn is_compatible(sym: &Symbol) -> bool {
     all(target_arch = "x86_64", target_family = "windows"),
     all(target_arch = "aarch64", target_vendor = "apple")
   )) && !sym.can_callback
+    && !matches!(sym.result_type, NativeType::Struct(_))
+    && !sym
+      .parameter_types
+      .iter()
+      .any(|t| matches!(t, NativeType::Struct(_)))
 }
 
 pub(crate) fn compile_trampoline(sym: &Symbol) -> Trampoline {
@@ -39,7 +44,7 @@ pub(crate) fn make_template(sym: &Symbol, trampoline: &Trampoline) -> Template {
     .chain(sym.parameter_types.iter().map(|t| t.into()))
     .collect::<Vec<_>>();
 
-  let ret = if needs_unwrap(sym.result_type) {
+  let ret = if needs_unwrap(&sym.result_type) {
     params.push(fast_api::Type::TypedArray(fast_api::CType::Int32));
     fast_api::Type::Void
   } else {
@@ -104,6 +109,9 @@ impl From<&NativeType> for fast_api::Type {
         fast_api::Type::Uint64
       }
       NativeType::Buffer => fast_api::Type::TypedArray(fast_api::CType::Uint8),
+      NativeType::Struct(_) => {
+        fast_api::Type::TypedArray(fast_api::CType::Uint8)
+      }
     }
   }
 }
@@ -161,9 +169,9 @@ impl SysVAmd64 {
     let mut compiler = Self::new();
 
     let must_cast_return_value =
-      compiler.must_cast_return_value(sym.result_type);
+      compiler.must_cast_return_value(sym.result_type.clone());
     let must_wrap_return_value =
-      compiler.must_wrap_return_value_in_typed_array(sym.result_type);
+      compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone());
     let must_save_preserved_register = must_wrap_return_value;
     let cannot_tailcall = must_cast_return_value || must_wrap_return_value;
 
@@ -174,7 +182,7 @@ impl SysVAmd64 {
       compiler.allocate_stack(&sym.parameter_types);
     }
 
-    for param in sym.parameter_types.iter().copied() {
+    for param in sym.parameter_types.iter().cloned() {
       compiler.move_left(param)
     }
     if !compiler.is_recv_arg_overridden() {
@@ -188,7 +196,7 @@ impl SysVAmd64 {
     if cannot_tailcall {
       compiler.call(sym.ptr.as_ptr());
       if must_cast_return_value {
-        compiler.cast_return_value(sym.result_type);
+        compiler.cast_return_value(sym.result_type.clone());
       }
       if must_wrap_return_value {
         compiler.wrap_return_value_in_out_array();
@@ -562,7 +570,7 @@ impl SysVAmd64 {
   fn must_wrap_return_value_in_typed_array(&self, rv: NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 64 bit integers by wrapping them in a TypedArray out parameter
-    crate::needs_unwrap(rv)
+    crate::needs_unwrap(&rv)
   }
 
   fn finalize(self) -> ExecutableBuffer {
@@ -607,7 +615,7 @@ impl Aarch64Apple {
     let mut compiler = Self::new();
 
     let must_wrap_return_value =
-      compiler.must_wrap_return_value_in_typed_array(sym.result_type);
+      compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone());
     let must_save_preserved_register = must_wrap_return_value;
     let cannot_tailcall = must_wrap_return_value;
 
@@ -619,14 +627,14 @@ impl Aarch64Apple {
       }
     }
 
-    for param in sym.parameter_types.iter().copied() {
+    for param in sym.parameter_types.iter().cloned() {
       compiler.move_left(param)
     }
     if !compiler.is_recv_arg_overridden() {
       // the receiver object should never be expected. Avoid its unexpected or deliberate leak
       compiler.zero_first_arg();
     }
-    if compiler.must_wrap_return_value_in_typed_array(sym.result_type) {
+    if compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone()) {
       compiler.save_out_array_to_preserved_register();
     }
 
@@ -961,7 +969,7 @@ impl Aarch64Apple {
     let mut int_params = 0u32;
     let mut float_params = 0u32;
     let mut stack_size = 0u32;
-    for param in symbol.parameter_types.iter().copied() {
+    for param in symbol.parameter_types.iter().cloned() {
       match param.into() {
         Float(float_param) => {
           float_params += 1;
@@ -1067,13 +1075,13 @@ impl Aarch64Apple {
   }
 
   fn must_save_preserved_register_to_stack(&mut self, symbol: &Symbol) -> bool {
-    self.must_wrap_return_value_in_typed_array(symbol.result_type)
+    self.must_wrap_return_value_in_typed_array(symbol.result_type.clone())
   }
 
   fn must_wrap_return_value_in_typed_array(&self, rv: NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 64 bit integers by wrapping them in a TypedArray out parameter
-    crate::needs_unwrap(rv)
+    crate::needs_unwrap(&rv)
   }
 
   fn finalize(self) -> ExecutableBuffer {
@@ -1118,9 +1126,9 @@ impl Win64 {
     let mut compiler = Self::new();
 
     let must_cast_return_value =
-      compiler.must_cast_return_value(sym.result_type);
+      compiler.must_cast_return_value(sym.result_type.clone());
     let must_wrap_return_value =
-      compiler.must_wrap_return_value_in_typed_array(sym.result_type);
+      compiler.must_wrap_return_value_in_typed_array(sym.result_type.clone());
     let must_save_preserved_register = must_wrap_return_value;
     let cannot_tailcall = must_cast_return_value || must_wrap_return_value;
 
@@ -1131,7 +1139,7 @@ impl Win64 {
       compiler.allocate_stack(&sym.parameter_types);
     }
 
-    for param in sym.parameter_types.iter().copied() {
+    for param in sym.parameter_types.iter().cloned() {
       compiler.move_left(param)
     }
     if !compiler.is_recv_arg_overridden() {
@@ -1145,7 +1153,7 @@ impl Win64 {
     if cannot_tailcall {
       compiler.call(sym.ptr.as_ptr());
       if must_cast_return_value {
-        compiler.cast_return_value(sym.result_type);
+        compiler.cast_return_value(sym.result_type.clone());
       }
       if must_wrap_return_value {
         compiler.wrap_return_value_in_out_array();
@@ -1429,7 +1437,7 @@ impl Win64 {
   fn must_wrap_return_value_in_typed_array(&self, rv: NativeType) -> bool {
     // V8 only supports i32 and u32 return types for integers
     // We support 64 bit integers by wrapping them in a TypedArray out parameter
-    crate::needs_unwrap(rv)
+    crate::needs_unwrap(&rv)
   }
 
   fn finalize(self) -> ExecutableBuffer {
@@ -1508,6 +1516,7 @@ impl From<NativeType> for Param {
       NativeType::I32 => Int(I(DW)),
       NativeType::I64 | NativeType::ISize => Int(I(QW)),
       NativeType::Buffer => Int(Buffer),
+      NativeType::Struct(_) => unimplemented!(),
     }
   }
 }

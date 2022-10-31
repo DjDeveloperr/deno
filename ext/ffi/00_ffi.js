@@ -13,6 +13,7 @@
     ArrayPrototypeJoin,
     ObjectPrototypeIsPrototypeOf,
     TypeError,
+    Uint8Array,
     Int32Array,
     Uint32Array,
     BigInt64Array,
@@ -213,6 +214,10 @@
     return type === "i64" || type === "isize";
   }
 
+  function isStruct(type) {
+    return typeof type === "object" && type !== null && ("struct" in type);
+  }
+
   class UnsafeCallback {
     #refcount;
     // Internal promise only meant to keep Deno from exiting
@@ -311,12 +316,17 @@
               configurable: false,
               enumerable: true,
               value: (...parameters) => {
-                return core.opAsync(
+                const ret = core.opAsync(
                   "op_ffi_call_nonblocking",
                   this.#rid,
                   symbol,
                   parameters,
                 );
+                if (isStruct(resultType)) {
+                  return ret.then((arr) => new Uint8Array(arr));
+                } else {
+                  return ret;
+                }
               },
               writable: false,
             },

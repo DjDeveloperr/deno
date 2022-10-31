@@ -37,6 +37,8 @@ assertThrows(
   "Failed to register symbol non_existent_symbol",
 );
 
+const Rect = ["f64", "f64", "f64", "f64"];
+
 const dylib = Deno.dlopen(libPath, {
   "printSomething": {
     name: "print_something",
@@ -210,6 +212,20 @@ const dylib = Deno.dlopen(libPath, {
     type: "pointer",
   },
   "hash": { parameters: ["buffer", "u32"], result: "u32" },
+  "make_rect": {
+    parameters: ["f64", "f64", "f64", "f64"],
+    result: { struct: Rect },
+  },
+  "make_rect_async": {
+    name: "make_rect",
+    nonblocking: true,
+    parameters: ["f64", "f64", "f64", "f64"],
+    result: { struct: Rect },
+  },
+  "print_rect": {
+    parameters: [{ struct: Rect }],
+    result: "void",
+  },
 });
 const { symbols } = dylib;
 
@@ -570,6 +586,12 @@ console.log(
 );
 const view = new Deno.UnsafePointerView(dylib.symbols.static_ptr);
 console.log("Static ptr value:", view.getUint32());
+
+let rect = dylib.symbols.make_rect(10, 20, 100, 200);
+dylib.symbols.print_rect(rect);
+dylib.symbols.print_rect(new Float64Array([20, 20, 100, 200]));
+rect = await dylib.symbols.make_rect_async(10, 20, 100, 200);
+console.log(rect instanceof Uint8Array);
 
 const arrayBuffer = view.getArrayBuffer(4);
 const uint32Array = new Uint32Array(arrayBuffer);

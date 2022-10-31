@@ -112,7 +112,7 @@ impl PtrSymbol {
         .clone()
         .into_iter()
         .map(libffi::middle::Type::from),
-      def.result.into(),
+      def.result.clone().into(),
     );
 
     Self { cif, ptr }
@@ -240,7 +240,7 @@ pub fn init<P: FfiPermissions + 'static>(unstable: bool) -> Extension {
 
 /// Defines the accepted types that can be used as
 /// parameters and return values in FFI.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum NativeType {
   Void,
@@ -260,6 +260,33 @@ enum NativeType {
   Pointer,
   Buffer,
   Function,
+  Struct(Vec<NativeType>),
+}
+
+impl NativeType {
+  fn get_size(&self) -> usize {
+    match self {
+      NativeType::Void => 0,
+      NativeType::U8 | NativeType::I8 | NativeType::Bool => 1,
+      NativeType::U16 | NativeType::I16 => 2,
+      NativeType::U32 | NativeType::I32 | NativeType::F32 => 4,
+      NativeType::U64 | NativeType::I64 | NativeType::F64 => 8,
+      NativeType::USize
+      | NativeType::ISize
+      | NativeType::Pointer
+      | NativeType::Function
+      | NativeType::Buffer => std::mem::size_of::<usize>(),
+      NativeType::Struct(fields) => NativeType::compute_struct_size(fields),
+    }
+  }
+
+  fn compute_struct_size(fields: &[NativeType]) -> usize {
+    let mut size = 0;
+    for field in fields {
+      size += field.get_size();
+    }
+    size
+  }
 }
 
 impl From<NativeType> for libffi::middle::Type {
@@ -281,6 +308,9 @@ impl From<NativeType> for libffi::middle::Type {
       NativeType::Pointer | NativeType::Buffer | NativeType::Function => {
         libffi::middle::Type::pointer()
       }
+      NativeType::Struct(fields) => libffi::middle::Type::structure(
+        fields.iter().map(|field| field.clone().into()),
+      ),
     }
   }
 }
@@ -307,7 +337,7 @@ union NativeValue {
 }
 
 impl NativeValue {
-  unsafe fn as_arg(&self, native_type: NativeType) -> Arg {
+  unsafe fn as_arg(&self, native_type: &NativeType) -> Arg {
     match native_type {
       NativeType::Void => unreachable!(),
       NativeType::Bool => Arg::new(&self.bool_value),
@@ -325,6 +355,14 @@ impl NativeValue {
       NativeType::F64 => Arg::new(&self.f64_value),
       NativeType::Pointer | NativeType::Buffer | NativeType::Function => {
         Arg::new(&self.pointer)
+      }
+      NativeType::Struct(_) => {
+        let boxed = Box::from_raw(self.struct_value);
+        let arg = Arg::new(&*boxed.as_ptr());
+        // Leak the box since libffi will take ownership of the
+        // struct memory.
+        let _ = Box::leak(boxed);
+        arg
       }
     }
   }
@@ -348,6 +386,10 @@ impl NativeValue {
       NativeType::F64 => Value::from(self.f64_value),
       NativeType::Pointer | NativeType::Function | NativeType::Buffer => {
         Value::from(self.pointer as usize)
+      }
+      NativeType::Struct(_) => {
+        let slice = Box::from_raw(self.struct_value);
+        Value::from(slice.to_vec())
       }
     }
   }
@@ -458,6 +500,18 @@ impl NativeValue {
           } else {
             v8::Number::new(scope, value as f64).into()
           };
+        local_value.into()
+      }
+      NativeType::Struct(_) => {
+        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(
+          Box::from_raw(self.struct_value),
+        );
+        let ab =
+          v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
+        let local_value: v8::Local<v8::Value> =
+          v8::Uint8Array::new(scope, ab, 0, ab.byte_length())
+            .unwrap()
+            .into();
         local_value.into()
       }
     }
@@ -643,7 +697,7 @@ where
             .clone()
             .into_iter()
             .map(libffi::middle::Type::from),
-          foreign_fn.result.into(),
+          foreign_fn.result.clone().into(),
         );
 
         let func_key = v8::String::new(scope, &symbol_key).unwrap();
@@ -678,7 +732,7 @@ where
   ))
 }
 
-fn needs_unwrap(rv: NativeType) -> bool {
+fn needs_unwrap(rv: &NativeType) -> bool {
   matches!(
     rv,
     NativeType::Function
@@ -691,7 +745,7 @@ fn needs_unwrap(rv: NativeType) -> bool {
   )
 }
 
-fn is_i64(rv: NativeType) -> bool {
+fn is_i64(rv: &NativeType) -> bool {
   matches!(rv, NativeType::I64 | NativeType::ISize)
 }
 
@@ -710,7 +764,7 @@ fn make_sync_fn<'s>(
       // SAFETY: The pointer will not be deallocated until the function is
       // garbage collected.
       let symbol = unsafe { &*(external.value() as *const Symbol) };
-      let needs_unwrap = match needs_unwrap(symbol.result_type) {
+      let needs_unwrap = match needs_unwrap(&symbol.result_type) {
         true => Some(args.get(symbol.parameter_types.len() as i32)),
         false => None,
       };
@@ -722,7 +776,7 @@ fn make_sync_fn<'s>(
               let backing_store =
                 view.buffer(scope).unwrap().get_backing_store();
 
-              if is_i64(symbol.result_type) {
+              if is_i64(&symbol.result_type) {
                 // SAFETY: v8::SharedRef<v8::BackingStore> is similar to Arc<[u8]>,
                 // it points to a fixed continuous slice of bytes on the heap.
                 let bs = unsafe {
@@ -745,8 +799,9 @@ fn make_sync_fn<'s>(
               }
             }
             None => {
-              // SAFETY: Same return type declared to libffi; trust user to have it right beyond that.
-              let result = unsafe { result.to_v8(scope, symbol.result_type) };
+              let result =
+                // SAFETY: Same return type declared to libffi; trust user to have it right beyond that.
+                unsafe { result.to_v8(scope, symbol.result_type.clone()) };
               rv.set(result.v8_value);
             }
           }
@@ -1026,6 +1081,38 @@ fn ffi_parse_buffer_arg(
   Ok(NativeValue { pointer })
 }
 
+fn ffi_parse_struct_arg(
+  scope: &mut v8::HandleScope,
+  arg: v8::Local<v8::Value>,
+) -> Result<NativeValue, AnyError> {
+  let size: usize;
+  let pointer = if let Ok(value) = v8::Local::<v8::ArrayBuffer>::try_from(arg) {
+    let backing_store = value.get_backing_store();
+    size = backing_store.byte_length();
+    &backing_store[..] as *const _ as *const u8
+  } else if let Ok(value) = v8::Local::<v8::ArrayBufferView>::try_from(arg) {
+    let byte_offset = value.byte_offset();
+    let backing_store = value
+      .buffer(scope)
+      .ok_or_else(|| {
+        type_error("Invalid FFI ArrayBufferView, expected data in the buffer")
+      })?
+      .get_backing_store();
+    size = backing_store.byte_length() - byte_offset;
+    &backing_store[byte_offset..] as *const _ as *const u8
+  } else {
+    return Err(type_error(
+      "Invalid FFI buffer type, expected null, ArrayBuffer, or ArrayBufferView",
+    ));
+  };
+  // SAFETY: The pointer is valid for the lifetime of the backing store.
+  let slice = unsafe { std::slice::from_raw_parts(pointer, size) };
+  let boxed = slice.to_vec().into_boxed_slice();
+  Ok(NativeValue {
+    struct_value: Box::into_raw(boxed),
+  })
+}
+
 #[inline]
 fn ffi_parse_function_arg(
   scope: &mut v8::HandleScope,
@@ -1117,6 +1204,9 @@ where
       NativeType::Function => {
         ffi_args.push(ffi_parse_function_arg(scope, value)?);
       }
+      NativeType::Struct(_) => {
+        ffi_args.push(ffi_parse_struct_arg(scope, value)?);
+      }
       NativeType::Void => {
         unreachable!();
       }
@@ -1196,12 +1286,20 @@ where
       NativeType::Function => {
         ffi_args.push(ffi_parse_function_arg(scope, value)?);
       }
+      NativeType::Struct(_) => {
+        ffi_args.push(ffi_parse_struct_arg(scope, value)?);
+      }
       NativeType::Void => {
         unreachable!();
       }
     }
   }
-  let call_args: Vec<Arg> = ffi_args.iter().map(Arg::new).collect();
+  let call_args: Vec<Arg> = ffi_args
+    .iter()
+    .enumerate()
+    // SAFETY: Creating a `Arg` from a `NativeValue` is pretty safe.
+    .map(|(i, v)| unsafe { v.as_arg(parameter_types.get(i).unwrap()) })
+    .collect();
   // SAFETY: types in the `Cif` match the actual calling convention and
   // types of symbol.
   unsafe {
@@ -1253,6 +1351,19 @@ where
           pointer: cif.call::<*mut c_void>(*fun_ptr, &call_args),
         }
       }
+      NativeType::Struct(fields) => {
+        let size = NativeType::compute_struct_size(fields);
+        let mut result = vec![0u8; size].into_boxed_slice();
+        libffi::raw::ffi_call(
+          symbol.cif.as_raw_ptr(),
+          Some(*symbol.ptr.as_safe_fun()),
+          result.as_mut_ptr() as *mut c_void,
+          call_args.as_ptr() as *mut *mut c_void,
+        );
+        NativeValue {
+          struct_value: Box::into_raw(result),
+        }
+      }
     })
   }
 }
@@ -1269,7 +1380,7 @@ fn ffi_call(
     .enumerate()
     .map(|(index, ffi_arg)| {
       // SAFETY: the union field is initialized
-      unsafe { ffi_arg.as_arg(*parameter_types.get(index).unwrap()) }
+      unsafe { ffi_arg.as_arg(parameter_types.get(index).unwrap()) }
     })
     .collect();
 
@@ -1322,6 +1433,19 @@ fn ffi_call(
       NativeType::Pointer | NativeType::Function | NativeType::Buffer => {
         NativeValue {
           pointer: cif.call::<*mut c_void>(fun_ptr, &call_args),
+        }
+      }
+      NativeType::Struct(fields) => {
+        let size = NativeType::compute_struct_size(&fields);
+        let mut result = vec![0u8; size].into_boxed_slice();
+        libffi::raw::ffi_call(
+          cif.as_raw_ptr(),
+          Some(*fun_ptr.as_safe_fun()),
+          result.as_mut_ptr() as *mut c_void,
+          call_args.as_ptr() as *mut *mut c_void,
+        );
+        NativeValue {
+          struct_value: Box::into_raw(result),
         }
       }
     })
@@ -1491,6 +1615,20 @@ unsafe fn do_ffi_callback(
         } else {
           v8::Number::new(scope, result as f64).into()
         }
+      }
+      NativeType::Struct(fields) => {
+        let size = NativeType::compute_struct_size(fields);
+        let ptr = (*val) as *const u8;
+        let slice = std::slice::from_raw_parts(ptr, size);
+        let boxed = slice.to_vec().into_boxed_slice();
+        let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(boxed);
+        let ab =
+          v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
+        let local_value: v8::Local<v8::Value> =
+          v8::Uint8Array::new(scope, ab, 0, ab.byte_length())
+            .unwrap()
+            .into();
+        local_value
       }
       NativeType::Void => unreachable!(),
     };
@@ -1743,7 +1881,7 @@ where
 
   let info: *mut CallbackInfo = Box::leak(Box::new(CallbackInfo {
     parameters: args.parameters.clone(),
-    result: args.result,
+    result: args.result.clone(),
     async_work_sender,
     callback,
     context,
@@ -1807,7 +1945,7 @@ where
     &symbol.cif,
     symbol.ptr,
     &def.parameters,
-    def.result,
+    def.result.clone(),
   )?;
   // SAFETY: Same return type declared to libffi; trust user to have it right beyond that.
   let result = unsafe { result.to_v8(scope, def.result) };
@@ -1881,6 +2019,7 @@ where
 
   let symbol = PtrSymbol::new(pointer, &def);
   let call_args = ffi_parse_args(scope, parameters, &def.parameters)?;
+  let def_result = def.result.clone();
 
   let join_handle = tokio::task::spawn_blocking(move || {
     let PtrSymbol { cif, ptr } = symbol.clone();
@@ -1892,7 +2031,7 @@ where
       .await
       .map_err(|err| anyhow!("Nonblocking FFI call failed: {}", err))??;
     // SAFETY: Same return type declared to libffi; trust user to have it right beyond that.
-    Ok(unsafe { result.to_value(def.result) })
+    Ok(unsafe { result.to_value(def_result) })
   })
 }
 
@@ -2026,6 +2165,20 @@ fn op_ffi_get_static<'scope>(
       };
       integer.into()
     }
+    NativeType::Struct(fields) => {
+      let size = NativeType::compute_struct_size(&fields);
+      let slice =
+        // SAFETY: Let's assume the symbol points to a valid struct
+        unsafe { std::slice::from_raw_parts(data_ptr as *const u8, size) };
+      let boxed = slice.to_vec().into_boxed_slice();
+      let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(boxed);
+      let ab = v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
+      let local_value: v8::Local<v8::Value> =
+        v8::Uint8Array::new(scope, ab, 0, ab.byte_length())
+          .unwrap()
+          .into();
+      local_value.into()
+    }
   })
 }
 
@@ -2050,7 +2203,7 @@ fn op_ffi_call_nonblocking<'scope>(
 
   let call_args = ffi_parse_args(scope, parameters, &symbol.parameter_types)?;
 
-  let result_type = symbol.result_type;
+  let result_type = symbol.result_type.clone();
   let join_handle = tokio::task::spawn_blocking(move || {
     let Symbol {
       cif,
