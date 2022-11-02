@@ -37,7 +37,10 @@ assertThrows(
   "Failed to register symbol non_existent_symbol",
 );
 
+const Point = ["f64", "f64"];
+const Size = ["f64", "f64"];
 const Rect = ["f64", "f64", "f64", "f64"];
+const RectNested = [{ struct: Point }, { struct: Size }];
 
 const dylib = Deno.dlopen(libPath, {
   "printSomething": {
@@ -220,7 +223,7 @@ const dylib = Deno.dlopen(libPath, {
     name: "make_rect",
     nonblocking: true,
     parameters: ["f64", "f64", "f64", "f64"],
-    result: { struct: Rect },
+    result: { struct: RectNested },
   },
   "print_rect": {
     parameters: [{ struct: Rect }],
