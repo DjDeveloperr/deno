@@ -1115,7 +1115,7 @@ fn ffi_parse_struct_arg(
     &backing_store[byte_offset..] as *const _ as *const u8
   } else {
     return Err(type_error(
-      "Invalid FFI buffer type, expected null, ArrayBuffer, or ArrayBufferView",
+      "Invalid FFI buffer type, expected ArrayBuffer, or ArrayBufferView",
     ));
   };
   Ok(NativeValue { pointer })
