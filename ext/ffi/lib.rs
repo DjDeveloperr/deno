@@ -261,12 +261,12 @@ enum NativeType {
   Pointer,
   Buffer,
   Function,
-  Struct(Vec<NativeType>),
+  Struct(Box<[NativeType]>),
 }
 
 impl NativeType {
-  fn get_size(&self) -> usize {
-    match self {
+  fn get_size(&self) -> Result<usize, AnyError> {
+    Ok(match self {
       NativeType::Void => 0,
       NativeType::U8 | NativeType::I8 | NativeType::Bool => 1,
       NativeType::U16 | NativeType::I16 => 2,
@@ -277,13 +277,15 @@ impl NativeType {
       | NativeType::Pointer
       | NativeType::Function
       | NativeType::Buffer => std::mem::size_of::<usize>(),
-      NativeType::Struct(_) => self.as_layout().size(),
-    }
+      NativeType::Struct(_) => self.as_layout()?.size(),
+    })
   }
 
-  fn as_layout(&self) -> Layout {
-    match self {
-      NativeType::Void => Layout::new::<()>(),
+  fn as_layout(&self) -> Result<Layout, AnyError> {
+    Ok(match self {
+      NativeType::Void => {
+        return Err(type_error("Void type cannot be used as a struct field"))
+      }
       NativeType::U8 => Layout::new::<u8>(),
       NativeType::I8 => Layout::new::<i8>(),
       NativeType::U16 => Layout::new::<u16>(),
@@ -300,15 +302,15 @@ impl NativeType {
       NativeType::Buffer => Layout::new::<usize>(),
       NativeType::Function => Layout::new::<usize>(),
       NativeType::Struct(fields) => {
-        let mut layout = Layout::from_size_align(0, 1).unwrap();
-        for field in fields {
-          let (new_layout, _) = layout.extend(field.as_layout()).unwrap();
+        let mut layout = Layout::from_size_align(0, 1)?;
+        for field in fields.iter() {
+          let (new_layout, _) = layout.extend(field.as_layout()?)?;
           layout = new_layout;
         }
         layout.pad_to_align()
       }
       NativeType::Bool => Layout::new::<bool>(),
-    }
+    })
   }
 }
 
@@ -1359,19 +1361,12 @@ where
           pointer: cif.call::<*mut c_void>(*fun_ptr, &call_args),
         }
       }
-      NativeType::Struct(_) => {
-        let size = result_type.get_size();
-        let mut result = vec![0u8; size].into_boxed_slice();
-        libffi::raw::ffi_call(
-          symbol.cif.as_raw_ptr(),
-          Some(*symbol.ptr.as_safe_fun()),
-          result.as_mut_ptr() as *mut c_void,
-          call_args.as_ptr() as *mut *mut c_void,
-        );
-        NativeValue {
-          struct_value: Box::into_raw(result),
-        }
-      }
+      NativeType::Struct(_) => ffi_call_rtype_struct(
+        result_type.get_size()?,
+        &symbol.cif,
+        &symbol.ptr,
+        call_args,
+      ),
     })
   }
 }
@@ -1444,17 +1439,7 @@ fn ffi_call(
         }
       }
       NativeType::Struct(_) => {
-        let size = result_type.get_size();
-        let mut result = vec![0u8; size].into_boxed_slice();
-        libffi::raw::ffi_call(
-          cif.as_raw_ptr(),
-          Some(*fun_ptr.as_safe_fun()),
-          result.as_mut_ptr() as *mut c_void,
-          call_args.as_ptr() as *mut *mut c_void,
-        );
-        NativeValue {
-          struct_value: Box::into_raw(result),
-        }
+        ffi_call_rtype_struct(result_type.get_size()?, cif, &fun_ptr, call_args)
       }
     })
   }
@@ -1625,7 +1610,7 @@ unsafe fn do_ffi_callback(
         }
       }
       NativeType::Struct(_) => {
-        let size = native_type.get_size();
+        let size = native_type.get_size().unwrap();
         let ptr = (*val) as *const u8;
         let slice = std::slice::from_raw_parts(ptr, size);
         let boxed = slice.to_vec().into_boxed_slice();
