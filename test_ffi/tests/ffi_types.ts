@@ -66,12 +66,12 @@ const remote = Deno.dlopen(
 
 Deno.dlopen(
   "dummy_lib_2.so",
-  // @ts-expect-error: Returning a function pointer
   // is declared using "pointer" or "function" + UnsafeFnPointer
   {
     wrong_method1: {
       parameters: [],
       result: {
+        // @ts-expect-error: Returning a function pointer
         function: {
           parameters: [],
           result: "void",

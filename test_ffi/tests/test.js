@@ -596,6 +596,19 @@ dylib.symbols.print_rect(new Float64Array([20, 20, 100, 200]));
 rect = await dylib.symbols.make_rect_async(10, 20, 100, 200);
 console.log(rect instanceof Uint8Array);
 
+const cb = new Deno.UnsafeCallback({
+  parameters: [{ struct: Rect }],
+  result: { struct: Rect },
+}, (rect) => {
+  rect = new Float64Array(rect.buffer);
+  return new Float64Array([rect[0] + 10, rect[1] + 10, rect[2] + 10, rect[3] + 10]);
+});
+
+const cbFfi = new Deno.UnsafeFnPointer(cb.pointer, cb.definition);
+console.log(new Float64Array(cbFfi.call(rect).buffer));
+
+cb.close();
+
 const arrayBuffer = view.getArrayBuffer(4);
 const uint32Array = new Uint32Array(arrayBuffer);
 console.log("arrayBuffer.byteLength:", arrayBuffer.byteLength);

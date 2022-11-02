@@ -130,6 +130,7 @@ fn basic() {
     Rect { x: 10.0, y: 20.0, w: 100.0, h: 200.0 }\n\
     Rect { x: 20.0, y: 20.0, w: 100.0, h: 200.0 }\n\
     true\n\
+    Float64Array(4) [ 20, 30, 110, 210 ]\n\
     arrayBuffer.byteLength: 4\n\
     uint32Array.length: 1\n\
     uint32Array[0]: 42\n\
