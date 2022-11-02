@@ -196,7 +196,7 @@ impl SysVAmd64 {
     if cannot_tailcall {
       compiler.call(sym.ptr.as_ptr());
       if must_cast_return_value {
-        compiler.cast_return_value(sym.result_type.clone());
+        compiler.cast_return_value(&sym.result_type);
       }
       if must_wrap_return_value {
         compiler.wrap_return_value_in_out_array();
@@ -408,7 +408,7 @@ impl SysVAmd64 {
     );
   }
 
-  fn cast_return_value(&mut self, rv: NativeType) {
+  fn cast_return_value(&mut self, rv: &NativeType) {
     let s = &mut self.assmblr;
     // V8 only supports 32bit integers. We support 8 and 16 bit integers casting them to 32bits.
     // In SysV-AMD64 the convention dictates that the unused bits of the return value contain garbage, so we
@@ -1153,7 +1153,7 @@ impl Win64 {
     if cannot_tailcall {
       compiler.call(sym.ptr.as_ptr());
       if must_cast_return_value {
-        compiler.cast_return_value(sym.result_type.clone());
+        compiler.cast_return_value(&sym.result_type);
       }
       if must_wrap_return_value {
         compiler.wrap_return_value_in_out_array();
@@ -1290,7 +1290,7 @@ impl Win64 {
     x64!(self.assmblr; xor ecx, ecx);
   }
 
-  fn cast_return_value(&mut self, rv: NativeType) {
+  fn cast_return_value(&mut self, rv: &NativeType) {
     let s = &mut self.assmblr;
     // V8 only supports 32bit integers. We support 8 and 16 bit integers casting them to 32bits.
     // Section "Return Values" of the Windows x64 Calling Convention doc:
