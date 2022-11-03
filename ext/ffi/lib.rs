@@ -1639,7 +1639,7 @@ unsafe fn do_ffi_callback(
         let size = native_type.get_size().unwrap();
         let ptr = (*val) as *const u8;
         let slice = std::slice::from_raw_parts(ptr, size);
-        let boxed = slice.to_vec().into_boxed_slice();
+        let boxed = Box::from(slice);
         let store = v8::ArrayBuffer::new_backing_store_from_boxed_slice(boxed);
         let ab =
           v8::ArrayBuffer::with_backing_store(scope, &store.make_shared());
