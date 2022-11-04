@@ -22,6 +22,7 @@
     PromisePrototypeThen,
     MathMax,
     MathCeil,
+    WeakMap,
   } = window.__bootstrap.primordials;
 
   const U32_BUFFER = new Uint32Array(2);
@@ -204,13 +205,16 @@
           );
         } else {
           const buffer = new Uint8Array(this.#structSize);
-          return core.opAsync(
-            "op_ffi_call_ptr_nonblocking",
-            this.pointer,
-            this.definition,
-            parameters,
-            buffer,
-          ).then(() => buffer);
+          return PromisePrototypeThen(
+            core.opAsync(
+              "op_ffi_call_ptr_nonblocking",
+              this.pointer,
+              this.definition,
+              parameters,
+              buffer,
+            ),
+            () => buffer,
+          );
         }
       } else {
         if (this.#structSize === null) {
@@ -247,18 +251,26 @@
     return typeof type === "object" && type !== null && ("struct" in type);
   }
 
-  function getTypeSize(type) {
+  function getTypeSize(type, cache = new WeakMap()) {
     if (isStruct(type)) {
-      // compute size of struct including padding
+      const cached = cache.get(type);
+      if (cached) {
+        if (cached === null) {
+          throw new TypeError("Recursive struct definition");
+        }
+        return cached;
+      }
+      cache.set(type, null);
       let size = 0;
       let alignment = 1;
       for (const field of type.struct) {
-        const fieldSize = getTypeSize(field);
+        const fieldSize = getTypeSize(field, cache);
         alignment = MathMax(alignment, fieldSize);
         size = MathCeil(size / fieldSize) * fieldSize;
         size += fieldSize;
       }
       size = MathCeil(size / alignment) * alignment;
+      cache.set(type, size);
       return size;
     }
 
@@ -277,15 +289,12 @@
       case "u64":
       case "i64":
       case "f64":
-        return 8;
       case "pointer":
       case "buffer":
       case "function":
       case "usize":
       case "isize":
-        return Deno.build.arch === "x86_64" || Deno.build.arch === "aarch64"
-          ? 8
-          : 4;
+        return 8;
       default:
         throw new TypeError(`Unsupported type: ${type}`);
     }
