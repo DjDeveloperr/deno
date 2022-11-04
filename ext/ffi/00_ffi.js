@@ -254,7 +254,7 @@
   function getTypeSize(type, cache = new WeakMap()) {
     if (isStruct(type)) {
       const cached = cache.get(type);
-      if (cached) {
+      if (cached !== undefined) {
         if (cached === null) {
           throw new TypeError("Recursive struct definition");
         }
