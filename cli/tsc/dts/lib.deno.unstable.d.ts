@@ -94,7 +94,7 @@ declare namespace Deno {
    */
   type NativeVoidType = "void";
 
-  type NativeStructType = { struct: NativeType[] };
+  type NativeStructType = { readonly struct: readonly NativeType[] };
 
   /** **UNSTABLE**: New API, yet to be vetted.
    *
