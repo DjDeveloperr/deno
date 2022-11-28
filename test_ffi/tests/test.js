@@ -229,6 +229,12 @@ const dylib = Deno.dlopen(libPath, {
     parameters: [{ struct: Rect }],
     result: "void",
   },
+  "print_rect_async": {
+    name: "print_rect",
+    nonblocking: true,
+    parameters: [{ struct: Rect }],
+    result: "void",
+  },
 });
 const { symbols } = dylib;
 
@@ -592,6 +598,7 @@ console.log("Static ptr value:", view.getUint32());
 
 let rect = dylib.symbols.make_rect(10, 20, 100, 200);
 dylib.symbols.print_rect(rect);
+await dylib.symbols.print_rect_async(rect);
 dylib.symbols.print_rect(new Float64Array([20, 20, 100, 200]));
 rect = await dylib.symbols.make_rect_async(10, 20, 100, 200);
 console.log(rect instanceof Uint8Array);
