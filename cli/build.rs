@@ -350,6 +350,7 @@ fn create_cli_snapshot(snapshot_path: PathBuf) -> CreateSnapshotOutput {
       None,
     ),
     deno_webstorage::deno_webstorage::init_ops(None),
+    deno_webserial::deno_webserial::init_ops(),
     deno_crypto::deno_crypto::init_ops(None),
     deno_broadcast_channel::deno_broadcast_channel::init_ops(
       deno_broadcast_channel::InMemoryBroadcastChannel::default(),

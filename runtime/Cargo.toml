@@ -58,6 +58,7 @@ deno_webidl.workspace = true
 deno_websocket.workspace = true
 deno_webstorage.workspace = true
 deno_napi.workspace = true
+deno_webserial.workspace = true
 
 [target.'cfg(windows)'.build-dependencies]
 winres.workspace = true
@@ -85,6 +86,7 @@ deno_webidl.workspace = true
 deno_websocket.workspace = true
 deno_webstorage.workspace = true
 fastwebsockets.workspace = true
+deno_webserial.workspace = true
 
 atty.workspace = true
 console_static_text.workspace = true

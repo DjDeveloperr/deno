@@ -39,6 +39,7 @@ import * as abortSignal from "ext:deno_web/03_abort_signal.js";
 import * as globalInterfaces from "ext:deno_web/04_global_interfaces.js";
 import * as webStorage from "ext:deno_webstorage/01_webstorage.js";
 import * as prompt from "ext:runtime/41_prompt.js";
+import * as webSerial from "ext:deno_webserial/01_webserial.js";
 
 // https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope
 const windowOrWorkerGlobalScope = {
@@ -202,6 +203,14 @@ ObjectDefineProperties(Navigator.prototype, {
       return [language];
     },
   },
+  serial: {
+    configurable: true,
+    enumerable: true,
+    get() {
+      webidl.assertBranded(this, NavigatorPrototype);
+      return webSerial.serial;
+    },
+  },
 });
 const NavigatorPrototype = Navigator.prototype;
 
@@ -241,6 +250,14 @@ ObjectDefineProperties(WorkerNavigator.prototype, {
         return [language];
       },
     },
+    serial: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        webidl.assertBranded(this, NavigatorPrototype);
+        return webSerial.serial;
+      },
+    },
   },
 });
 const WorkerNavigatorPrototype = WorkerNavigator.prototype;
@@ -259,6 +276,8 @@ const mainRuntimeGlobalProperties = {
   localStorage: util.getterOnly(webStorage.localStorage),
   sessionStorage: util.getterOnly(webStorage.sessionStorage),
   Storage: util.nonEnumerable(webStorage.Storage),
+  Serial: util.nonEnumerable(webSerial.Serial),
+  SerialPort: util.nonEnumerable(webSerial.SerialPort),
 };
 
 const workerRuntimeGlobalProperties = {

@@ -257,6 +257,7 @@ impl MainWorker {
       deno_webstorage::deno_webstorage::init_ops(
         options.origin_storage_dir.clone(),
       ),
+      deno_webserial::deno_webserial::init_ops(),
       deno_crypto::deno_crypto::init_ops(options.seed),
       deno_broadcast_channel::deno_broadcast_channel::init_ops(
         options.broadcast_channel.clone(),

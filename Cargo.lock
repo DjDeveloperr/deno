@@ -3,6 +3,27 @@
 version = 3
 
 [[package]]
+name = "CoreFoundation-sys"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0e9889e6db118d49d88d84728d0e964d973a5680befb5f85f55141beea5c20b"
+dependencies = [
+ "libc",
+ "mach",
+]
+
+[[package]]
+name = "IOKit-sys"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99696c398cbaf669d2368076bdb3d627fb0ce51a26899d7c61228c5c0af3bf4a"
+dependencies = [
+ "CoreFoundation-sys",
+ "libc",
+ "mach",
+]
+
+[[package]]
 name = "Inflector"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -763,7 +784,7 @@ dependencies = [
  "lsp-types",
  "monch",
  "napi_sym",
- "nix",
+ "nix 0.24.2",
  "notify",
  "once_cell",
  "os_pipe",
@@ -1006,7 +1027,7 @@ dependencies = [
  "fs3",
  "libc",
  "log",
- "nix",
+ "nix 0.24.2",
  "rand",
  "serde",
  "tokio",
@@ -1079,7 +1100,7 @@ dependencies = [
  "deno_core",
  "filetime",
  "fs3",
- "nix",
+ "nix 0.24.2",
  "once_cell",
  "tokio",
  "winapi",
@@ -1277,6 +1298,7 @@ dependencies = [
  "deno_url",
  "deno_web",
  "deno_webidl",
+ "deno_webserial",
  "deno_websocket",
  "deno_webstorage",
  "dlopen",
@@ -1290,7 +1312,7 @@ dependencies = [
  "libc",
  "log",
  "netif",
- "nix",
+ "nix 0.24.2",
  "notify",
  "ntapi",
  "once_cell",
@@ -1385,6 +1407,17 @@ version = "0.107.0"
 dependencies = [
  "deno_bench_util",
  "deno_core",
+]
+
+[[package]]
+name = "deno_webserial"
+version = "0.1.0"
+dependencies = [
+ "deno_core",
+ "deno_web",
+ "serde",
+ "tokio",
+ "tokio-serial",
 ]
 
 [[package]]
@@ -2892,6 +2925,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "mach"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fd13ee2dd61cc82833ba05ade5a30bb3d63f7ced605ef827063c63078302de9"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "mach2"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d0d1830bcd151a6fc4aea1369af235b36c1528fe976b8ff678683c9995eade8"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "match_cfg"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2952,6 +3003,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2982,6 +3042,19 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.45.0",
+]
+
+[[package]]
+name = "mio-serial"
+version = "5.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20a4c60ca5c9c0e114b3bd66ff4aa5f9b2b175442be51ca6c4365d687a97a2ac"
+dependencies = [
+ "log",
+ "mio",
+ "nix 0.26.2",
+ "serialport",
+ "winapi",
 ]
 
 [[package]]
@@ -3050,7 +3123,21 @@ dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
  "libc",
- "memoffset",
+ "memoffset 0.6.5",
+]
+
+[[package]]
+name = "nix"
+version = "0.26.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfdda3d196821d6af13126e40375cdf7da646a96114af134d5f417a9a1dc8e1a"
+dependencies = [
+ "bitflags 1.3.2",
+ "cfg-if",
+ "libc",
+ "memoffset 0.7.1",
+ "pin-utils",
+ "static_assertions",
 ]
 
 [[package]]
@@ -4032,7 +4119,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix",
+ "nix 0.24.2",
  "radix_trie",
  "scopeguard",
  "unicode-segmentation",
@@ -4298,6 +4385,23 @@ dependencies = [
  "smallvec",
  "thiserror",
  "v8",
+]
+
+[[package]]
+name = "serialport"
+version = "4.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "353dc2cbfc67c9a14a89a1292a9d8e819bd51066b083e08c1974ba08e3f48c62"
+dependencies = [
+ "CoreFoundation-sys",
+ "IOKit-sys",
+ "bitflags 1.3.2",
+ "cfg-if",
+ "mach2",
+ "nix 0.26.2",
+ "regex",
+ "scopeguard",
+ "winapi",
 ]
 
 [[package]]
@@ -5094,7 +5198,7 @@ dependencies = [
  "hyper 0.14.26",
  "lazy-regex",
  "lsp-types",
- "nix",
+ "nix 0.24.2",
  "once_cell",
  "os_pipe",
  "parking_lot 0.12.1",
@@ -5246,6 +5350,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0d409377ff5b1e3ca6437aa86c1eb7d40c134bfec254e44c830defa92669db5"
 dependencies = [
  "rustls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-serial"
+version = "5.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa6e2e4cf0520a99c5f87d5abb24172b5bd220de57c3181baaaa5440540c64aa"
+dependencies = [
+ "cfg-if",
+ "futures",
+ "log",
+ "mio-serial",
  "tokio",
 ]
 

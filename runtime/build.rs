@@ -233,6 +233,7 @@ mod startup_snapshot {
       deno_cache,
       deno_websocket,
       deno_webstorage,
+      deno_webserial,
       deno_crypto,
       deno_broadcast_channel,
       // FIXME(bartlomieju): this should be reenabled
@@ -311,6 +312,7 @@ mod startup_snapshot {
         None,
       ),
       deno_webstorage::deno_webstorage::init_ops_and_esm(None),
+      deno_webserial::deno_webserial::init_ops_and_esm(),
       deno_crypto::deno_crypto::init_ops_and_esm(None),
       deno_broadcast_channel::deno_broadcast_channel::init_ops_and_esm(
         deno_broadcast_channel::InMemoryBroadcastChannel::default(),

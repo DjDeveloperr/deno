@@ -224,6 +224,7 @@
     "ext:deno_websocket/01_websocket.js": "../ext/websocket/01_websocket.js",
     "ext:deno_websocket/02_websocketstream.js": "../ext/websocket/02_websocketstream.js",
     "ext:deno_webstorage/01_webstorage.js": "../ext/webstorage/01_webstorage.js",
+    "ext:deno_webserial/01_webserial.js": "../ext/webserial/01_webserial.js",
     "ext:runtime/01_errors.js": "../runtime/js/01_errors.js",
     "ext:runtime/01_version.ts": "../runtime/js/01_version.ts",
     "ext:runtime/06_util.js": "../runtime/js/06_util.js",
